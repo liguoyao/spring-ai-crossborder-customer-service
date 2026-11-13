@@ -11,9 +11,9 @@ spring:
   datasource:
     type: com.alibaba.druid.pool.DruidDataSource
     druid:
-      url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:omni_merchant}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
-      username: ${MYSQL_USER:omnimerchant}
-      password: ${MYSQL_PASSWORD}
+      url: jdbc:mysql://${MYSQL_HOST:47.111.16.30}:${MYSQL_PORT:13306}/${MYSQL_DATABASE:omni_merchant}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+      username: ${MYSQL_USER:root}
+      password: ${MYSQL_PASSWORD:Qgjh@2024}
       driver-class-name: com.mysql.cj.jdbc.Driver
       initial-size: 2
       min-idle: 2
@@ -33,17 +33,12 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration/mysql
-    url: ${FLYWAY_URL:}
-    user: ${FLYWAY_USER:}
-    password: ${FLYWAY_PASSWORD:}
-    baseline-on-migrate: false
-    clean-disabled: true
-    validate-on-migrate: true
+    baseline-on-migrate: true
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
+      host: ${REDIS_HOST:r-bp11djv7d4lnne5p6z.redis.rds.aliyuncs.com}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+      password: ${REDIS_PASSWORD:heMntYjSC3GArYe3hCWGvEEF}
       timeout: 3000ms
   ai:
     model:
@@ -55,7 +50,7 @@ spring:
       image: none
       moderation: none
     openai:
-      api-key: ${OPENAI_API_KEY:}
+      api-key: ${OPENAI_API_KEY:sk-ws-H.YPEIIPH.KCDi.MEUCIAmNm5P-S9qRcpSnokmd4uYo4dvPU8kEwVkb0WnBIePMAiEA3F3AiXGQMXLyHNScH4ZPKkH15tFL5N-q58QIv_Q_zHE}
       chat:
         options:
           model: ${OPENAI_CHAT_MODEL:gpt-4o-mini}
@@ -63,6 +58,8 @@ spring:
           maxTokens: 4096
         connect-timeout: 30s
         read-timeout: 60s
+        model: glm-5.3
+        base-url: https://ws-8bf265nmnx04mmu8.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
       embedding:
         options:
           model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
@@ -162,7 +159,7 @@ mybatis-plus:
   type-aliases-package: com.omnimerchant.**.entity
 
 rocketmq:
-  name-server: ${ROCKETMQ_NAME_SERVER:localhost:9876}
+  name-server: ${ROCKETMQ_NAME_SERVER:47.111.16.30:9876}
   producer:
     group: omni-producer-group
 
