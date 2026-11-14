@@ -88,7 +88,7 @@ npm run build
 Full local runtime also requires Docker services and database initialization:
 
 ```powershell
-docker compose up -d mysql redis postgres rocketmq-namesrv rocketmq-broker
+docker compose up -d mysql redis postgres rocketmq-namesrv rocketmq-broker rocketmq-proxy
 .\scripts\demo.ps1
 mvn -pl omni-merchant-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=dev
 ```

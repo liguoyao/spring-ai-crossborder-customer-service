@@ -92,6 +92,8 @@ cp .env.example .env
 
 首次启动由 Flyway 自动迁移 MySQL 与 PostgreSQL/pgvector，并加载 2 个演示租户、10 个客户、20 个商品、30 个订单、客服工单、政策知识和评测数据。角色来自服务端身份与租户 membership，不能由登录页自行选择。
 
+`.env` 仅用于本地开发：Spring Boot 通过 `spring-dotenv` 自动加载项目根目录的 `.env`；Docker Compose 仍只把 `environment:` 中显式声明的变量注入容器，真实环境变量始终优先。
+
 ## 工程架构
 
 ```mermaid
@@ -231,7 +233,7 @@ docker compose -f compose.demo.yml config --quiet
 |------|------|
 | 后端 | Java 21、Spring Boot 4.1、Spring AI 2.0、MyBatis-Plus、Spring Security |
 | AI / RAG | Tool Calling、Advisor、PGVector、BM25、RRF、rerank fallback、citation、deterministic eval |
-| 数据与中间件 | MySQL 8、PostgreSQL 16 + pgvector、Redis 7、RocketMQ、Flyway |
+| 数据与中间件 | MySQL 8、PostgreSQL 16 + pgvector、Redis 7、RocketMQ 5.x Proxy (gRPC 客户端)、Flyway |
 | 可靠性 | Resilience4j Reactor、transactional outbox、idempotency、Actuator、Prometheus |
 | 前端 | Vue 3、TypeScript、Ant Design Vue、ECharts、Pinia、Vite、Vitest、Playwright |
 

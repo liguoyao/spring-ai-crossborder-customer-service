@@ -12,7 +12,7 @@
 
     <artifactId>omni-merchant-message</artifactId>
     <packaging>jar</packaging>
-    <description>消息模块：RocketMQ 消息处理、通知分发</description>
+    <description>消息模块：RocketMQ Proxy 消息处理、通知分发</description>
 
     <dependencies>
         <dependency>
@@ -21,17 +21,7 @@
         </dependency>
         <dependency>
             <groupId>org.apache.rocketmq</groupId>
-            <artifactId>rocketmq-spring-boot-starter</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>com.google.guava</groupId>
-                    <artifactId>guava</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
+            <artifactId>rocketmq-client-java</artifactId>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>

@@ -30,9 +30,9 @@ public class OmniMerchantProperties {
 
     @Data
     public static class PgVectorConfig {
-        private String url = "jdbc:postgresql://localhost:5432/omni_merchant";
-        private String username = "omnimerchant";
-        private String password;
+        private String url = "jdbc:postgresql://47.111.16.30:5432/omni_merchant";
+        private String username = "app";
+        private String password = "app123456";
         private String driverClassName = "org.postgresql.Driver";
         private boolean migrationEnabled = true;
         private HikariConfig hikari = new HikariConfig();

@@ -21,10 +21,12 @@ Copy-Item .env.example .env
 - `PG_PASSWORD`
 - `ADMIN_EMAIL`
 - `ADMIN_PASSWORD`
-- `JWT_SECRET`，至少 32 字节
+- `JWT_SECRET`，至少 32 字节（256 位）；可用 `openssl rand -hex 32` 生成
 - `INTEGRATION_ENCRYPTION_KEY`，至少 32 字节
 
 仓库没有可用于部署的默认管理员密码。`ADMIN_EMAIL/ADMIN_PASSWORD` 仅用于首次 bootstrap，密码入库前会被 BCrypt 哈希。
+
+本地源码启动（`mvn -pl omni-merchant-bootstrap -am spring-boot:run`）会通过 `spring-dotenv` 自动读取项目根目录的 `.env`，无需手动导入 shell；真实操作系统环境变量和 Docker Compose 的 `environment:` 优先级更高。`.env` 已被 `.dockerignore` 排除，不会进入容器镜像，容器内仍由 compose 注入变量。
 
 ## 3. 一键启动
 
@@ -49,12 +51,14 @@ Copy-Item .env.example .env
 ## 4. 源码开发
 
 ```powershell
-docker compose -f compose.demo.yml up -d mysql redis postgres rocketmq-namesrv rocketmq-broker
+docker compose -f compose.demo.yml up -d mysql redis postgres rocketmq-namesrv rocketmq-broker rocketmq-proxy
 
 $env:JAVA_HOME='C:\Program Files\Java\jdk-21'
 $env:SPRING_PROFILES_ACTIVE='local,demo'
 mvn -pl omni-merchant-bootstrap -am spring-boot:run
 ```
+
+RocketMQ 通过 Proxy 的 gRPC 端口连接：本地为 `ROCKETMQ_ENDPOINTS=localhost:8081`，容器内为 `rocketmq-proxy:8081`。生产环境请把 `ROCKETMQ_ENDPOINTS` 指向 Proxy 集群（多个地址以 `;` 分隔），并按需配置 `ROCKETMQ_ACCESS_KEY`、`ROCKETMQ_SECRET_KEY`。
 
 另开终端：
 

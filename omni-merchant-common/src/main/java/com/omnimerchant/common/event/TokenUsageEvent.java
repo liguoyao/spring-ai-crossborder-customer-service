@@ -9,7 +9,7 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * Token usage event sent via RocketMQ for async persistence.
+ * Token usage event sent via RocketMQ Proxy (gRPC) for async persistence.
  */
 @Data
 @Builder

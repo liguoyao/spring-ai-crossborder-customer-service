@@ -78,7 +78,7 @@ flowchart TB
 | PostgreSQL + pgvector | 政策与商品 embedding | 每个查询显式携带 tenant metadata；隔离或过期文档不参与召回 |
 | Redis | 付费调用限流、会话锁和短期协调 | 限流状态缺失时拒绝付费 LLM 调用；数据库唯一 guard 防止重复业务动作 |
 | Transactional outbox | Connector 和 Webhook 工作项 | 入站状态与 outbox 意图同事务提交；重试与 DLQ 不绕过幂等校验 |
-| RocketMQ | 可替换异步传输层 | 不是业务事实来源，outbox 状态保持权威 |
+| RocketMQ Proxy | 可替换异步传输层（gRPC 接入） | 不是业务事实来源，outbox 状态保持权威 |
 
 ## 可信控制
 

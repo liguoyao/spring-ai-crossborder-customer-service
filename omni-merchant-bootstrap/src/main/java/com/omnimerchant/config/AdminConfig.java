@@ -32,7 +32,7 @@ public class AdminConfig {
     @Bean
     public JwtUtil jwtUtil() {
         if (jwtSecret == null || jwtSecret.isBlank()) {
-            throw new IllegalStateException("admin.jwt-secret must be configured via JWT_SECRET");
+            throw new IllegalStateException("admin.jwt-secret must be configured via JWT_SECRET (at least 32 bytes)");
         }
         return new JwtUtil(jwtSecret, previousJwtSecret, jwtExpirationMs,
                 adminIssuer, adminAudience, widgetIssuer, widgetAudience);

@@ -31,7 +31,8 @@
     <properties>
         <java.version>21</java.version>
         <spring-ai.version>2.0.0</spring-ai.version>
-        <rocketmq.version>2.3.1</rocketmq.version>
+        <rocketmq-client-java.version>5.2.2</rocketmq-client-java.version>
+        <spring-dotenv.version>5.1.0</spring-dotenv.version>
         <pgvector.version>0.1.6</pgvector.version>
         <mybatis-plus.version>3.5.16</mybatis-plus.version>
         <druid.version>1.2.28</druid.version>
@@ -111,11 +112,18 @@
                 <version>${project.version}</version>
             </dependency>
 
-            <!-- RocketMQ Spring Boot Starter -->
+            <!-- RocketMQ 5.x gRPC client (connects through Proxy endpoints) -->
             <dependency>
                 <groupId>org.apache.rocketmq</groupId>
-                <artifactId>rocketmq-spring-boot-starter</artifactId>
-                <version>${rocketmq.version}</version>
+                <artifactId>rocketmq-client-java</artifactId>
+                <version>${rocketmq-client-java.version}</version>
+            </dependency>
+
+            <!-- Loads the root .env into Spring Environment for local development -->
+            <dependency>
+                <groupId>me.paulschwarz</groupId>
+                <artifactId>springboot4-dotenv</artifactId>
+                <version>${spring-dotenv.version}</version>
             </dependency>
 
             <!-- PGVector JDBC -->
@@ -125,7 +133,7 @@
                 <version>${pgvector.version}</version>
             </dependency>
 
-            <!-- Override Guava android variant pulled by RocketMQ -->
+            <!-- Pin Guava to the JRE variant for transitive dependencies -->
             <dependency>
                 <groupId>com.google.guava</groupId>
                 <artifactId>guava</artifactId>

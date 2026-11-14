@@ -73,6 +73,19 @@ services:
     depends_on:
       - rocketmq-namesrv
 
+  rocketmq-proxy:
+    image: apache/rocketmq:5.1.4
+    restart: on-failure
+    command: sh mqproxy
+    ports:
+      - "${ROCKETMQ_GRPC_PORT:-8081}:8081"
+    environment:
+      JAVA_OPT_EXT: "-Xms256m -Xmx256m"
+      NAMESRV_ADDR: rocketmq-namesrv:9876
+    depends_on:
+      - rocketmq-namesrv
+      - rocketmq-broker
+
   rocketmq-dashboard:
     image: apacherocketmq/rocketmq-dashboard:2.0.1
     restart: unless-stopped
@@ -106,7 +119,7 @@ services:
       PG_DATABASE: ${PG_DATABASE:-omni_merchant}
       PG_USER: ${PG_USER:-omnimerchant}
       PG_PASSWORD: ${PG_PASSWORD:?PG_PASSWORD is required}
-      ROCKETMQ_NAME_SERVER: rocketmq-namesrv:9876
+      ROCKETMQ_ENDPOINTS: rocketmq-proxy:8081
       ADMIN_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL is required}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
@@ -127,6 +140,8 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      rocketmq-proxy:
+        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8090/actuator/health >/dev/null || exit 1"]
       interval: 10s

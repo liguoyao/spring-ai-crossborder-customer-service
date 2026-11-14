@@ -26,6 +26,11 @@ spring:
       test-on-borrow: false
       test-on-return: false
       filters: stat,wall
+      filter:
+        wall:
+          enabled: true
+          config:
+            comment-allow: true
       stat-view-servlet:
         enabled: false
       web-stat-filter:
@@ -52,10 +57,6 @@ spring:
     openai:
       api-key: ${OPENAI_API_KEY:sk-ws-H.YPEIIPH.KCDi.MEUCIAmNm5P-S9qRcpSnokmd4uYo4dvPU8kEwVkb0WnBIePMAiEA3F3AiXGQMXLyHNScH4ZPKkH15tFL5N-q58QIv_Q_zHE}
       chat:
-        options:
-          model: ${OPENAI_CHAT_MODEL:gpt-4o-mini}
-          temperature: 0.3
-          maxTokens: 4096
         connect-timeout: 30s
         read-timeout: 60s
         model: glm-5.3
@@ -75,11 +76,16 @@ spring:
         connect-timeout: 30s
         read-timeout: 60s
 
+springdotenv:
+  enabled: ${SPRINGDOTENV_ENABLED:true}
+  ignore-if-missing: true
+  ignore-if-malformed: true
+
 omnimerchant:
   pgvector:
-    url: jdbc:postgresql://${PG_HOST:localhost}:${PG_PORT:5432}/${PG_DATABASE:omni_merchant}
-    username: ${PG_USER:omnimerchant}
-    password: ${PG_PASSWORD}
+    url: jdbc:postgresql://${PG_HOST:47.111.16.30}:${PG_PORT:5432}/${PG_DATABASE:omni_merchant}
+    username: ${PG_USER:app}
+    password: ${PG_PASSWORD:app123456}
     driver-class-name: org.postgresql.Driver
     migration-enabled: ${PG_FLYWAY_ENABLED:true}
     hikari:
@@ -117,6 +123,16 @@ omnimerchant:
     client-id: ${SHOPIFY_CLIENT_ID:}
     client-secret: ${SHOPIFY_CLIENT_SECRET:}
     scopes: ${SHOPIFY_SCOPES:read_products,read_customers,read_orders,read_fulfillments}
+  rocketmq:
+    enabled: ${ROCKETMQ_ENABLED:true}
+    endpoints: ${ROCKETMQ_ENDPOINTS:47.111.16.30:18081}
+    access-key: ${ROCKETMQ_ACCESS_KEY:}
+    secret-key: ${ROCKETMQ_SECRET_KEY:}
+    ssl-enabled: ${ROCKETMQ_SSL_ENABLED:false}
+    request-timeout: ${ROCKETMQ_REQUEST_TIMEOUT:10s}
+    topic: ${ROCKETMQ_TOPIC:omni-token-usage}
+    tag: ${ROCKETMQ_TAG:daily}
+    consumer-group: ${ROCKETMQ_CONSUMER_GROUP:omni-token-usage-consumer}
 
 management:
   endpoints:
@@ -158,11 +174,6 @@ mybatis-plus:
   mapper-locations: classpath*:mapper/**/*.xml
   type-aliases-package: com.omnimerchant.**.entity
 
-rocketmq:
-  name-server: ${ROCKETMQ_NAME_SERVER:47.111.16.30:9876}
-  producer:
-    group: omni-producer-group
-
 resilience4j:
   circuitbreaker:
     configs:
@@ -181,9 +192,9 @@ resilience4j:
         failure-rate-threshold: 50
 
 admin:
-  email: ${ADMIN_EMAIL}
-  password: ${ADMIN_PASSWORD}
-  jwt-secret: ${JWT_SECRET}
+  email: ${ADMIN_EMAIL:1254770191@qq.com}
+  password: ${ADMIN_PASSWORD:123456}
+  jwt-secret: ${JWT_SECRET:e22575f0eb2462a416dcac0d180b62cc3dd93b3a80b0888f79e8a1e47563c70c}
   jwt-previous-secret: ${JWT_PREVIOUS_SECRET:}
   jwt-expiration-ms: ${JWT_EXPIRATION_MS:86400000}
   refresh-expiration-ms: ${REFRESH_TOKEN_EXPIRATION_MS:2592000000}

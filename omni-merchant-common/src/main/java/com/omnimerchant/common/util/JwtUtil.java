@@ -279,7 +279,13 @@ public class JwtUtil {
 
     private SecretKey key(String secret, String name) {
         required(secret, name);
-        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        byte[] bytes = secret.getBytes(StandardCharsets.UTF_8);
+        if (bytes.length < 32) {
+            throw new IllegalArgumentException(name + " must be at least 32 bytes (256 bits) for HMAC-SHA "
+                    + "JWT signing; current length is " + bytes.length
+                    + " bytes. Generate one with: openssl rand -hex 32");
+        }
+        return Keys.hmacShaKeyFor(bytes);
     }
 
     private String required(String value, String name) {

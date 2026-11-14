@@ -1,41 +1,45 @@
 package com.omnimerchant.agent.advisor;
 
 import com.omnimerchant.common.event.TokenUsageEvent;
+import com.omnimerchant.common.mq.RocketMQClientFactory;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.rocketmq.spring.core.RocketMQTemplate;
+import org.apache.rocketmq.client.apis.message.Message;
 import org.springframework.stereotype.Component;
 
 /**
- * Sends token usage events to RocketMQ for async persistence.
+ * Sends token usage events to RocketMQ Proxy (gRPC) for async persistence.
  * Fire-and-forget — failures are logged but never block the response path.
  */
 @Slf4j
 @Component
 public class TokenUsageProducer {
 
-    private static final String TOPIC = "omni-token-usage";
-    private static final String TAG = "daily";
+    private final RocketMQClientFactory clientFactory;
 
-    private final RocketMQTemplate rocketMQTemplate;
-
-    public TokenUsageProducer(RocketMQTemplate rocketMQTemplate) {
-        this.rocketMQTemplate = rocketMQTemplate;
+    public TokenUsageProducer(RocketMQClientFactory clientFactory) {
+        this.clientFactory = clientFactory;
     }
 
     public void sendAsync(TokenUsageEvent event) {
+        if (!clientFactory.isEnabled()) {
+            log.debug("RocketMQ client disabled, skipping token usage event");
+            return;
+        }
         try {
-            rocketMQTemplate.asyncSend(TOPIC + ":" + TAG, event, new org.apache.rocketmq.client.producer.SendCallback() {
-                @Override
-                public void onSuccess(org.apache.rocketmq.client.producer.SendResult sendResult) {
-                    log.debug("Token usage event sent: tenant={}, model={}, tokens={}",
-                            event.getTenantId(), event.getModelName(),
-                            event.getPromptTokens() + event.getCompletionTokens());
-                }
-
-                @Override
-                public void onException(Throwable e) {
+            Message message = clientFactory.newMessageBuilder()
+                    .setTopic(clientFactory.topic())
+                    .setTag(clientFactory.tag())
+                    .setKeys(String.valueOf(event.getTenantId()))
+                    .setBody(clientFactory.serialize(event))
+                    .build();
+            clientFactory.producer().sendAsync(message).whenComplete((receipt, throwable) -> {
+                if (throwable != null) {
                     log.warn("Failed to send token usage event: tenant={}, model={}, error={}",
-                            event.getTenantId(), event.getModelName(), e.getMessage());
+                            event.getTenantId(), event.getModelName(), throwable.getMessage());
+                } else {
+                    log.debug("Token usage event sent: tenant={}, model={}, tokens={}, messageId={}",
+                            event.getTenantId(), event.getModelName(),
+                            event.getPromptTokens() + event.getCompletionTokens(), receipt.getMessageId());
                 }
             });
         } catch (Exception e) {
