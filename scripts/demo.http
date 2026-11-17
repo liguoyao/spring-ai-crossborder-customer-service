@@ -1,0 +1,38 @@
+### GET request to example server
+GET https://examples.http-client.intellij.net/get
+    ?generated-in=IntelliJ IDEA
+
+###
+
+
+
+# curl --request POST
+#  --url http://localhost:8090/api/chat/stream
+#  --header 'Accept: */*'
+#  --header 'Accept-Encoding: gzip, deflate, br'
+#  --header 'Authorization: Bearer eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxMjU0NzcwMTkxQHFxLmNvbSIsImp0aSI6IjNkY2M4NjlhLTdiNzMtNGNlMS1hNjcyLWE3NWVmOTkyOTY0MSIsImlzcyI6Im9tbmltZXJjaGFudC1hZG1pbiIsImF1ZCI6Im9tbmltZXJjaGFudC1hZG1pbi1hcGkiLCJ1c2VySWQiOjEsInJvbGUiOiJBRE1JTiIsInJvbGVzIjpbIlBMQVRGT1JNX0FETUlOIl0sInRlbmFudElkcyI6W10sInRlbmFudFJvbGVzIjp7fSwidGVuYW50UGVybWlzc2lvbnMiOnt9LCJwbGF0Zm9ybUFkbWluIjp0cnVlLCJ0b2tlblZlcnNpb24iOjEsImlhdCI6MTc5NDkwNjIyMiwiZXhwIjoxNzk0OTkyNjIyfQ.q5XXt6TgVRivdGNbT2n-Xlq9vrRO_1GaUCvR90pt7QXboG5cJU8dlnTXR7alV0WnLjJvDn5i_1K3M8O0DaqH3w'
+#  --header 'Connection: keep-alive'
+#  --header 'Content-Type: application/json'
+#  --header 'Idempotency-Key: X'
+#  --header 'User-Agent: PostmanRuntime-ApipostRuntime/1.1.0'
+#  --header 'X-Tenant-Id: 1'
+#  --data '{
+#    "conversationUuid": "qweqw111e",
+#    "message": "你好"
+#}'
+POST http://localhost:8090/api/chat/stream
+Accept: */*
+Accept-Encoding: gzip, deflate, br
+Authorization: Bearer eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxMjU0NzcwMTkxQHFxLmNvbSIsImp0aSI6IjNkY2M4NjlhLTdiNzMtNGNlMS1hNjcyLWE3NWVmOTkyOTY0MSIsImlzcyI6Im9tbmltZXJjaGFudC1hZG1pbiIsImF1ZCI6Im9tbmltZXJjaGFudC1hZG1pbi1hcGkiLCJ1c2VySWQiOjEsInJvbGUiOiJBRE1JTiIsInJvbGVzIjpbIlBMQVRGT1JNX0FETUlOIl0sInRlbmFudElkcyI6W10sInRlbmFudFJvbGVzIjp7fSwidGVuYW50UGVybWlzc2lvbnMiOnt9LCJwbGF0Zm9ybUFkbWluIjp0cnVlLCJ0b2tlblZlcnNpb24iOjEsImlhdCI6MTc5NDkwNjIyMiwiZXhwIjoxNzk0OTkyNjIyfQ.q5XXt6TgVRivdGNbT2n-Xlq9vrRO_1GaUCvR90pt7QXboG5cJU8dlnTXR7alV0WnLjJvDn5i_1K3M8O0DaqH3w
+Connection: keep-alive
+Idempotency-Key: X
+User-Agent: PostmanRuntime-ApipostRuntime/1.1.0
+X-Tenant-Id: 1
+Content-Type: application/json
+
+{
+  "conversationUuid": "qweqw111e",
+  "message": "你好"
+}
+
+###
