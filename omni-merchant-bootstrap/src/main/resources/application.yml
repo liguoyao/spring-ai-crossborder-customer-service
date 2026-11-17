@@ -64,7 +64,7 @@ spring:
         dimensions: 1536
 
 springdotenv:
-  enabled: ${SPRINGDOTENV_ENABLED}
+  enabled: true
   ignore-if-missing: true
   ignore-if-malformed: true
 

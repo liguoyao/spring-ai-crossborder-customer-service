@@ -4,6 +4,7 @@ import com.omnimerchant.common.event.TokenUsageEvent;
 import com.omnimerchant.common.mq.RocketMQClientFactory;
 import com.omnimerchant.tenant.entity.TokenUsageDaily;
 import com.omnimerchant.tenant.mapper.TokenUsageDailyMapper;
+import com.omnimerchant.tenant.context.TenantContextHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.client.apis.consumer.ConsumeResult;
 import org.apache.rocketmq.client.apis.consumer.MessageListener;
@@ -56,13 +57,25 @@ public class TokenUsageConsumer implements MessageListener, InitializingBean {
             log.warn("Discard malformed token usage message: {}", e.getMessage());
             return ConsumeResult.SUCCESS;
         }
+        if (event == null || event.getTenantId() == null) {
+            log.warn("Discard token usage message without tenant ID");
+            return ConsumeResult.SUCCESS;
+        }
+        var previousTenant = TenantContextHolder.get();
         try {
+            TenantContextHolder.set(event.getTenantId());
             persist(event);
             return ConsumeResult.SUCCESS;
         } catch (Exception e) {
             log.error("Failed to persist token usage event: tenant={}, model={}, error={}",
                     event.getTenantId(), event.getModelName(), e.getMessage());
             return ConsumeResult.FAILURE;
+        } finally {
+            if (previousTenant == null) {
+                TenantContextHolder.clear();
+            } else {
+                TenantContextHolder.set(previousTenant);
+            }
         }
     }
 
@@ -98,7 +111,7 @@ public class TokenUsageConsumer implements MessageListener, InitializingBean {
             record.setTenantId(event.getTenantId());
             record.setUsageDate(usageDate);
             record.setModelName(modelName);
-            record.setModelProvider(event.getProviderName());
+            record.setModelProvider(TokenUsageEvent.resolveProviderName(event.getProviderName(), modelName));
             record.setPromptTokens((long) event.getPromptTokens());
             record.setCompletionTokens((long) event.getCompletionTokens());
             record.setTotalTokens((long) (event.getPromptTokens() + event.getCompletionTokens()));

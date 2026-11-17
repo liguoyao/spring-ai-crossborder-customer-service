@@ -29,4 +29,13 @@ public class TokenUsageEvent implements Serializable {
     private String intent;
     private String conversationUuid;
     private LocalDateTime timestamp;
+
+    /** Backward compatibility for messages queued before providerName was populated. */
+    public static String resolveProviderName(String provider, String model) {
+        if (provider != null && !provider.isBlank()) return provider.trim();
+        var name = model == null ? "" : model.toLowerCase(java.util.Locale.ROOT);
+        if (name.startsWith("deepseek")) return "deepseek";
+        if (name.startsWith("qwen") || name.startsWith("text-embedding-v")) return "dashscope";
+        return "unknown";
+    }
 }

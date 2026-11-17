@@ -31,6 +31,10 @@ public class TokenUsageAdvisor {
      * Fires an async RocketMQ event for persistence.
      */
     public void record(int promptTokens, int completionTokens, String model, long latencyMs) {
+        record(promptTokens, completionTokens, model, latencyMs, TokenUsageEvent.resolveProviderName(null, model));
+    }
+
+    public void record(int promptTokens, int completionTokens, String model, long latencyMs, String provider) {
         totalPromptTokens.addAndGet(promptTokens);
         totalCompletionTokens.addAndGet(completionTokens);
         totalCalls.incrementAndGet();
@@ -43,6 +47,7 @@ public class TokenUsageAdvisor {
         var event = TokenUsageEvent.builder()
                 .tenantId(tenantId)
                 .modelName(model)
+                .providerName(TokenUsageEvent.resolveProviderName(provider, model))
                 .promptTokens(promptTokens)
                 .completionTokens(completionTokens)
                 .latencyMs(latencyMs)
@@ -53,6 +58,12 @@ public class TokenUsageAdvisor {
 
     public void recordWithContext(int promptTokens, int completionTokens, String model,
                                   long latencyMs, String intent, String conversationUuid) {
+        recordWithContext(promptTokens, completionTokens, model, latencyMs, intent, conversationUuid,
+                TokenUsageEvent.resolveProviderName(null, model));
+    }
+
+    public void recordWithContext(int promptTokens, int completionTokens, String model,
+                                  long latencyMs, String intent, String conversationUuid, String provider) {
         totalPromptTokens.addAndGet(promptTokens);
         totalCompletionTokens.addAndGet(completionTokens);
         totalCalls.incrementAndGet();
@@ -64,6 +75,7 @@ public class TokenUsageAdvisor {
         var event = TokenUsageEvent.builder()
                 .tenantId(tenantId)
                 .modelName(model)
+                .providerName(TokenUsageEvent.resolveProviderName(provider, model))
                 .promptTokens(promptTokens)
                 .completionTokens(completionTokens)
                 .latencyMs(latencyMs)

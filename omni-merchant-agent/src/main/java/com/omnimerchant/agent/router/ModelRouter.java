@@ -42,7 +42,7 @@ public class ModelRouter {
                     providerName, modelName);
             return new RoutedModel(null, providerName, modelName);
         }
-        return new RoutedModel(new RateLimitedChatModel(model, rateLimiter, tokenUsageAdvisor, modelName),
+        return new RoutedModel(new RateLimitedChatModel(model, rateLimiter, tokenUsageAdvisor, modelName, providerName),
                 providerName, modelName);
     }
 

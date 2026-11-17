@@ -1,6 +1,7 @@
 package com.omnimerchant.agent.ratelimit;
 
 import com.omnimerchant.agent.advisor.TokenUsageAdvisor;
+import com.omnimerchant.common.event.TokenUsageEvent;
 import com.omnimerchant.agent.context.CallContextHolder;
 import com.omnimerchant.agent.context.CallContextHolder.CallContext;
 import com.omnimerchant.tenant.context.TenantContextHolder;
@@ -11,6 +12,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.chat.prompt.ChatOptions;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
@@ -30,13 +32,31 @@ public class RateLimitedChatModel implements ChatModel {
     private final TokenRateLimiter rateLimiter;
     private final TokenUsageAdvisor tokenUsageAdvisor;
     private final String modelName;
+    private final String providerName;
 
     public RateLimitedChatModel(ChatModel delegate, TokenRateLimiter rateLimiter,
                                 TokenUsageAdvisor tokenUsageAdvisor, String modelName) {
+        this(delegate, rateLimiter, tokenUsageAdvisor, modelName,
+                TokenUsageEvent.resolveProviderName(null, modelName));
+    }
+
+    public RateLimitedChatModel(ChatModel delegate, TokenRateLimiter rateLimiter,
+                                TokenUsageAdvisor tokenUsageAdvisor, String modelName, String providerName) {
         this.delegate = delegate;
         this.rateLimiter = rateLimiter;
         this.tokenUsageAdvisor = tokenUsageAdvisor;
         this.modelName = modelName;
+        this.providerName = providerName;
+    }
+
+    @Override
+    public ChatOptions getOptions() {
+        return delegate.getOptions();
+    }
+
+    @Override
+    public ChatOptions getDefaultOptions() {
+        return delegate.getDefaultOptions();
     }
 
     @Override
@@ -79,7 +99,7 @@ public class RateLimitedChatModel implements ChatModel {
                         recordUsage(lastResponse[0], latencyMs, tenantId, callContext);
                     } else {
                         TenantContextHolder.set(tenantId);
-                        tokenUsageAdvisor.record(0, 0, modelName, latencyMs);
+                        tokenUsageAdvisor.record(0, 0, modelName, latencyMs, providerName);
                     }
                 })
                 .doOnError(e -> log.error("Stream error for model {}: {}", modelName, e.getMessage()));
@@ -95,9 +115,9 @@ public class RateLimitedChatModel implements ChatModel {
                 TenantContextHolder.set(tenantId);
                 if (callContext != null) {
                     tokenUsageAdvisor.recordWithContext(promptTokens, completionTokens, modelName,
-                            latencyMs, callContext.intent(), callContext.conversationUuid());
+                            latencyMs, callContext.intent(), callContext.conversationUuid(), providerName);
                 } else {
-                    tokenUsageAdvisor.record(promptTokens, completionTokens, modelName, latencyMs);
+                    tokenUsageAdvisor.record(promptTokens, completionTokens, modelName, latencyMs, providerName);
                 }
                 rateLimiter.recordTokenUsage(tenantId, promptTokens + completionTokens);
             }
