@@ -19,6 +19,14 @@ public class OmniMerchantProperties {
     @Data
     public static class LlmConfig {
         private DeepSeekConfig deepseek = new DeepSeekConfig();
+        private DashScopeConfig dashscope = new DashScopeConfig();
+    }
+
+    @Data
+    public static class DashScopeConfig {
+        private String apiKey;
+        private String baseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+        private String model = "qwen-plus";
     }
 
     @Data
@@ -55,7 +63,11 @@ public class OmniMerchantProperties {
         @Data
         public static class EmbeddingConfig {
             private int cacheTtlHours = 1;
-            private int batchSize = 20;
+            private int batchSize = 10;
+            private String model = "text-embedding-v4";
+            private String baseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+            private int dimensions = 1536;
+            private String cacheVersion = "v2";
         }
 
         @Data

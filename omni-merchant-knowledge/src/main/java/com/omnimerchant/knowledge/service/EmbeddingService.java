@@ -12,10 +12,11 @@ import org.springframework.util.DigestUtils;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * Text embedding service with Redis caching.
- * Cache hit avoids redundant OpenAI API calls (cost savings).
+ * DashScope embeddings with model-specific Redis caching.
  */
 @Slf4j
 @Service
@@ -41,9 +42,16 @@ public class EmbeddingService {
         var cached = stringRedisTemplate.opsForValue().get(cacheKey);
         if (cached != null) {
             log.debug("Embedding cache hit for key={}", cacheKey);
-            return deserialize(cached);
+            try {
+                var vector = deserialize(cached);
+                validateVector(vector);
+                return vector;
+            } catch (IllegalArgumentException e) {
+                log.warn("Ignoring invalid embedding cache entry: {}", cacheKey);
+            }
         }
         var result = model.embed(text);
+        validateVector(result);
         var ttlHours = props.getKnowledge().getEmbedding().getCacheTtlHours();
         stringRedisTemplate.opsForValue().set(cacheKey, serialize(result), Duration.ofHours(ttlHours));
         log.debug("Embedding cached for key={}, dim={}", cacheKey, result.length);
@@ -54,7 +62,18 @@ public class EmbeddingService {
         if (texts.isEmpty()) return List.of();
         var model = requireEmbeddingModel();
         log.debug("Batch embedding {} texts", texts.size());
-        var results = model.embed(texts);
+        var batchSize = Math.min(props.getKnowledge().getEmbedding().getBatchSize(), 10);
+        if (batchSize <= 0) throw new IllegalArgumentException("Embedding batch size must be positive");
+        var results = new ArrayList<float[]>(texts.size());
+        for (int offset = 0; offset < texts.size(); offset += batchSize) {
+            var batch = texts.subList(offset, Math.min(offset + batchSize, texts.size()));
+            var vectors = model.embed(batch);
+            if (vectors.size() != batch.size()) {
+                throw new IllegalStateException("Embedding response count does not match input count");
+            }
+            vectors.forEach(this::validateVector);
+            results.addAll(vectors);
+        }
         log.debug("Batch embedding complete: {} vectors returned", results.size());
         return results;
     }
@@ -67,7 +86,7 @@ public class EmbeddingService {
         var model = embeddingModel.getIfAvailable();
         if (model == null) {
             throw new IllegalStateException(
-                    "Embedding model is not configured. Set SPRING_AI_MODEL_EMBEDDING=openai and OPENAI_API_KEY to enable RAG indexing/retrieval.");
+                    "Embedding model is not configured. Set SPRING_AI_MODEL_EMBEDDING=openai and DASHSCOPE_API_KEY to enable DashScope embeddings.");
         }
         return model;
     }
@@ -78,14 +97,28 @@ public class EmbeddingService {
         if (tenantId == null) {
             throw new IllegalStateException("Missing tenant context for embedding cache");
         }
-        return CACHE_KEY_PREFIX + tenantId + ":" + md5;
+        var config = props.getKnowledge().getEmbedding();
+        var identity = config.getBaseUrl() + "|" + config.getModel() + "|"
+                + config.getDimensions() + "|" + config.getCacheVersion();
+        var modelHash = DigestUtils.md5DigestAsHex(identity.getBytes(StandardCharsets.UTF_8));
+        return CACHE_KEY_PREFIX + "v2:" + tenantId + ":" + modelHash + ":" + md5;
+    }
+
+    private void validateVector(float[] vector) {
+        var dimensions = props.getKnowledge().getEmbedding().getDimensions();
+        if (dimensions != 1536 || vector == null || vector.length != dimensions) {
+            throw new IllegalArgumentException("Embedding must have 1536 dimensions to match vector tables");
+        }
+        for (float value : vector) {
+            if (!Float.isFinite(value)) throw new IllegalArgumentException("Embedding contains non-finite values");
+        }
     }
 
     private String serialize(float[] vec) {
         var sb = new StringBuilder();
         for (int i = 0; i < vec.length; i++) {
             if (i > 0) sb.append(",");
-            sb.append(String.format("%.8f", vec[i]));
+            sb.append(Float.toString(vec[i]));
         }
         return sb.toString();
     }

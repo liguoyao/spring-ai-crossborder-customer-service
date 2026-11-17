@@ -42,7 +42,7 @@ public class TestChatController {
             CallContextHolder.set("TEST", "test-chat");
             var routed = modelRouter.route("UNCLEAR");
             if (!routed.available()) {
-                return R.fail("503", "LLM provider is not configured. Set OPENAI_API_KEY, ANTHROPIC_API_KEY, or DEEPSEEK_API_KEY.");
+                return R.fail("503", "LLM provider is not configured. Set DEEPSEEK_API_KEY or DASHSCOPE_API_KEY.");
             }
             var response = routed.chatModel().call(new Prompt(userMessage));
             var output = response.getResult().getOutput();

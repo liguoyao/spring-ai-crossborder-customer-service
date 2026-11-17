@@ -6,7 +6,6 @@ import com.omnimerchant.agent.dto.ChatStreamEvent;
 import com.omnimerchant.common.constant.Constants;
 import com.omnimerchant.common.util.JwtUtil;
 import org.junit.jupiter.api.Test;
-import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -42,8 +41,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "admin.password=ci-password",
         "admin.jwt-secret=01234567890123456789012345678901",
         "omnimerchant.integrations.encryption-key=01234567890123456789012345678901",
-        "spring.ai.openai.api-key=ci-placeholder",
-        "spring.ai.anthropic.api-key=ci-placeholder",
         "omnimerchant.rocketmq.enabled=false",
         "omnimerchant.message.enabled=false",
         "springdotenv.enabled=false"
@@ -81,14 +78,12 @@ class SecurityContractsIT {
     @MockitoBean
     TokenUsageProducer tokenUsageProducer;
 
-    @MockitoBean(name = "openAiChatModel")
-    OpenAiChatModel openAiChatModel;
 
     @MockitoBean(name = "deepSeekChatModel")
     OpenAiChatModel deepSeekChatModel;
 
-    @MockitoBean(name = "anthropicChatModel")
-    AnthropicChatModel anthropicChatModel;
+    @MockitoBean(name = "dashScopeChatModel")
+    OpenAiChatModel dashScopeChatModel;
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {

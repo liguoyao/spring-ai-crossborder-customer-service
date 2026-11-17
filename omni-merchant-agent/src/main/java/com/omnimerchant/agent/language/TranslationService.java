@@ -17,7 +17,7 @@ import java.util.Map;
 
 /**
  * LLM 翻译服务：中转英语策略核心。
- * 用 gpt-4o-mini 做任意 2 种语言之间的翻译。
+ * 用 DeepSeek 做任意 2 种语言之间的翻译。
  */
 @Slf4j
 @Service
@@ -30,10 +30,10 @@ public class TranslationService implements TranslationProvider {
 
     private volatile String translationPromptTemplate;
 
-    public TranslationService(@Qualifier("openAiChatModel") ObjectProvider<OpenAiChatModel> chatModel,
+    public TranslationService(@Qualifier("deepSeekChatModel") ObjectProvider<OpenAiChatModel> chatModel,
                               ResourceLoader resourceLoader,
                               TranslationTokenProtector tokenProtector,
-                              @Value("${spring.ai.openai.chat.options.model:gpt-4o-mini}") String modelName) {
+                              @Value("${omnimerchant.llm.deepseek.model:deepseek-chat}") String modelName) {
         this.chatModel = chatModel;
         this.resourceLoader = resourceLoader;
         this.tokenProtector = tokenProtector;
@@ -62,9 +62,9 @@ public class TranslationService implements TranslationProvider {
         try {
             var model = chatModel.getIfAvailable();
             if (model == null) {
-                log.debug("Translation skipped {}->{}: OpenAI chat model is not configured", sourceLang, targetLang);
+                log.debug("Translation skipped {}->{}: DeepSeek chat model is not configured", sourceLang, targetLang);
                 return new TranslationResult(text, text, sourceLang, targetLang,
-                        "OPENAI", modelName, "FALLBACK", System.currentTimeMillis() - start,
+                        "DEEPSEEK", modelName, "FALLBACK", System.currentTimeMillis() - start,
                         "MODEL_NOT_CONFIGURED");
             }
             var protectedText = tokenProtector.protect(text);
@@ -76,14 +76,14 @@ public class TranslationService implements TranslationProvider {
                     sourceLang, targetLang, elapsed, text.length());
             if (result == null || result.isBlank()) {
                 return new TranslationResult(text, text, sourceLang, targetLang,
-                        "OPENAI", modelName, "FALLBACK", elapsed, "EMPTY_PROVIDER_RESPONSE");
+                        "DEEPSEEK", modelName, "FALLBACK", elapsed, "EMPTY_PROVIDER_RESPONSE");
             }
             return new TranslationResult(text, protectedText.restore(result.trim()), sourceLang, targetLang,
-                    "OPENAI", modelName, "SUCCESS", elapsed, null);
+                    "DEEPSEEK", modelName, "SUCCESS", elapsed, null);
         } catch (Exception e) {
             log.error("Translation failed {}->{}: {}", sourceLang, targetLang, e.getMessage());
             return new TranslationResult(text, text, sourceLang, targetLang,
-                    "OPENAI", modelName, "FALLBACK", System.currentTimeMillis() - start,
+                    "DEEPSEEK", modelName, "FALLBACK", System.currentTimeMillis() - start,
                     "PROVIDER_ERROR");
         }
     }

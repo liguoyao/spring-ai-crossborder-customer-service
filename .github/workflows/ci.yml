@@ -120,8 +120,7 @@ jobs:
           MYSQL_ROOT_PASSWORD: ci-mysql-root-password
           MYSQL_PASSWORD: ci-mysql-password
           PG_PASSWORD: ci-postgres-password
-          OPENAI_API_KEY: ci-placeholder
-          ANTHROPIC_API_KEY: ci-placeholder
+          DASHSCOPE_API_KEY: ci-placeholder
           DEEPSEEK_API_KEY: ci-placeholder
         run: docker compose -f compose.demo.yml config --quiet
       - name: Verify OpenAPI v4 endpoint contract

@@ -35,7 +35,7 @@ class MultiLingualEngineTest {
         assertThat(result.getConfidence()).isEqualTo(0.98231);
         assertThat(result.getTranslatedText()).isEqualTo("Hello, when will my order arrive?");
         assertThat(result.getTranslationStatus()).isEqualTo("SUCCESS");
-        assertThat(result.getTranslationProvider()).isEqualTo("OPENAI");
+        assertThat(result.getTranslationProvider()).isEqualTo("DEEPSEEK");
     }
 
     @Test
@@ -63,7 +63,7 @@ class MultiLingualEngineTest {
         when(languageDetector.needsTranslation("es")).thenReturn(true);
         when(translationService.translateDetailed(source, "es", "en"))
                 .thenReturn(new TranslationResult(source, source, "es", "en",
-                        "OPENAI", "gpt-4o-mini", "FALLBACK", 3, "MODEL_NOT_CONFIGURED"));
+                        "DEEPSEEK", "deepseek-chat", "FALLBACK", 3, "MODEL_NOT_CONFIGURED"));
 
         var result = engine.preprocess(source);
 
@@ -86,6 +86,6 @@ class MultiLingualEngineTest {
 
     private TranslationResult success(String source, String translated, String from, String to) {
         return new TranslationResult(source, translated, from, to,
-                "OPENAI", "gpt-4o-mini", "SUCCESS", 25, null);
+                "DEEPSEEK", "deepseek-chat", "SUCCESS", 25, null);
     }
 }

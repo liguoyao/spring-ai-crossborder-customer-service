@@ -55,7 +55,7 @@ OmniMerchant 不是只接一个模型的聊天 Demo。它把买家咨询、商�
 
 - Docker Desktop
 - 源码开发另需 Java 21、Maven 3.8+、Node.js 22
-- OpenAI、Anthropic、DeepSeek key 均为可选；没有模型 key 时，管理后台、业务数据、CONTRACT eval 和确定性 RAG 证据仍可运行
+- DeepSeek、DashScope key 均为可选；没有模型 key 时，管理后台、业务数据、CONTRACT eval 和确定性 RAG 证据仍可运行
 
 ### Windows
 

@@ -4,7 +4,7 @@ import com.omnimerchant.agent.advisor.TokenUsageAdvisor;
 import com.omnimerchant.agent.ratelimit.RateLimitedChatModel;
 import com.omnimerchant.agent.ratelimit.TokenRateLimiter;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.anthropic.AnthropicChatModel;
+import com.omnimerchant.common.config.OmniMerchantProperties;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.beans.factory.ObjectProvider;
@@ -19,22 +19,19 @@ import org.springframework.stereotype.Service;
 @Service
 public class ModelRouter {
 
-    private final RoutedModel openAiModel;
-    private final RoutedModel anthropicModel;
+    private final RoutedModel dashScopeModel;
     private final RoutedModel deepSeekModel;
 
     public ModelRouter(
-            @Qualifier("openAiChatModel") ObjectProvider<OpenAiChatModel> openAiChatModel,
-            @Qualifier("anthropicChatModel") ObjectProvider<AnthropicChatModel> anthropicChatModel,
+            @Qualifier("dashScopeChatModel") ObjectProvider<OpenAiChatModel> dashScopeChatModel,
             @Qualifier("deepSeekChatModel") ObjectProvider<OpenAiChatModel> deepSeekChatModel,
+            OmniMerchantProperties props,
             TokenRateLimiter rateLimiter,
             TokenUsageAdvisor tokenUsageAdvisor) {
-        this.openAiModel = wrap(openAiChatModel.getIfAvailable(), rateLimiter, tokenUsageAdvisor,
-                "openai", "gpt-4o-mini");
-        this.anthropicModel = wrap(anthropicChatModel.getIfAvailable(), rateLimiter, tokenUsageAdvisor,
-                "anthropic", "claude-haiku-4-5");
+        this.dashScopeModel = wrap(dashScopeChatModel.getIfAvailable(), rateLimiter, tokenUsageAdvisor,
+                "dashscope", props.getLlm().getDashscope().getModel());
         this.deepSeekModel = wrap(deepSeekChatModel.getIfAvailable(), rateLimiter, tokenUsageAdvisor,
-                "deepseek", "deepseek-chat");
+                "deepseek", props.getLlm().getDeepseek().getModel());
     }
 
     private RoutedModel wrap(ChatModel model, TokenRateLimiter rateLimiter,
@@ -56,24 +53,24 @@ public class ModelRouter {
     }
 
     public RoutedModel fallback() {
-        return firstAvailable(deepSeekModel, openAiModel, anthropicModel);
+        return firstAvailable(deepSeekModel, dashScopeModel);
     }
 
     private RoutedModel selectModel(String intent) {
         if (intent == null) {
-            return firstAvailable(openAiModel, deepSeekModel, anthropicModel);
+            return firstAvailable(deepSeekModel, dashScopeModel);
         }
         var preferred = switch (intent.toUpperCase()) {
             case "COMPLAINT", "ESCALATION" ->
-                    anthropicModel;
+                    dashScopeModel;
             case "ORDER_QUERY", "LOGISTICS_TRACKING",
                  "REFUND_POLICY", "PRODUCT_INQUIRY",
                  "GREETING", "UNCLEAR" ->
-                    openAiModel;
+                    deepSeekModel;
             default ->
-                    openAiModel;
+                    deepSeekModel;
         };
-        return firstAvailable(preferred, openAiModel, deepSeekModel, anthropicModel);
+        return firstAvailable(preferred, deepSeekModel, dashScopeModel);
     }
 
     private RoutedModel firstAvailable(RoutedModel... candidates) {

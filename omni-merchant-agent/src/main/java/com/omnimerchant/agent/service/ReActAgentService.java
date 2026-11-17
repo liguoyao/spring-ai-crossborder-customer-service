@@ -220,7 +220,7 @@ public class ReActAgentService {
             agentStateMachineService.failRun(tenantId, conversationUuid, traceId, error.getMessage());
             agentTraceService.failRun(traceId, error, (int) (System.currentTimeMillis() - traceStartedAt));
             return Flux.just(ChatStreamEvent.error("[CONFIG_ERROR] LLM provider is not configured. "
-                    + "Set OPENAI_API_KEY, ANTHROPIC_API_KEY, or DEEPSEEK_API_KEY to enable AI chat."));
+                    + "Set DEEPSEEK_API_KEY or DASHSCOPE_API_KEY to enable AI chat."));
         }
 
         var callbacks = agentExecutionGuardService.guardedCallbacks(

@@ -133,3 +133,29 @@ Gate A 的 fresh clone 可以重建 demo volume。不要对包含真实数据的
 - 抖店当前只有 fixture-backed cache sync；OAuth 与测试店铺只读同步是 Gate B。
 - Shopify 是 connector backbone；不执行真实退款、取消、改地址或补发。
 - `compose.prod.yml` 是配置边界模板，不代表已经完成托管双实例和公开生产 SLA。
+
+## 模型提供商配置
+
+聊天仅接入 DeepSeek 和阿里 DashScope，均通过 Spring AI 的 OpenAI 兼容客户端调用，无需 OpenAI 或 Anthropic 账号。
+
+在 `.env` 中设置 `DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL`，以及
+`DASHSCOPE_API_KEY`、`DASHSCOPE_BASE_URL`、`DASHSCOPE_MODEL`。Base URL 应包含供应商要求的完整兼容路径，
+例如 DashScope 的 `https://dashscope.aliyuncs.com/compatible-mode/v1`；工作空间专属地址以控制台为准。
+普通意图优先 DeepSeek，投诉和升级优先 DashScope；只配置一家时使用可用的提供商。
+翻译仍直接使用原主力模型的位置（现在为 DeepSeek），不经过意图路由。聊天模型按 API key 自动注册，无需设置 `SPRING_AI_MODEL_CHAT=openai`。
+
+聊天模型：DeepSeek 替换 OpenAI，DashScope 替换 Anthropic。
+聊天分别配置 `DEEPSEEK_API_KEY` 和 `DASHSCOPE_API_KEY`；只填写一家时，另一家不会启用。
+## DashScope Embedding
+
+本地 `.env` 使用 `SPRING_AI_MODEL_EMBEDDING=openai` 启用 OpenAI 兼容客户端，实际请求发往阿里，
+无需 OpenAI 账号。默认复用 `DASHSCOPE_API_KEY` 和 `DASHSCOPE_BASE_URL`。
+如聊天模型与 Embedding 的权限或端点不同，可单独配置 `DASHSCOPE_EMBEDDING_API_KEY`、
+`DASHSCOPE_EMBEDDING_BASE_URL`（填写完整 `/compatible-mode/v1` 地址）。
+模型使用 `DASHSCOPE_EMBEDDING_MODEL=text-embedding-v4`，固定输出 1536 维，与现有向量表一致。
+`.env.example` 默认关闭 Embedding，填好阿里凭据后将开关设为 `openai` 即可。
+
+文档索引按最多 10 条分批请求并保持原顺序；返回数量或维度错误时拒绝写入。
+缓存按租户、端点、模型、维度、`EMBEDDING_CACHE_VERSION` 隔离，旧缓存自然过期，不需要清空 Redis。
+更换 Embedding 模型后，必须通过知识库重新索引已有文档；旧模型向量即使同为 1536 维，也不能直接混用。
+本次代码修改不删除或重建数据库中的历史向量。
