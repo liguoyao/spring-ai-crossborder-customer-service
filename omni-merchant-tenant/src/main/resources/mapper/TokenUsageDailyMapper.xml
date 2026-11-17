@@ -3,6 +3,24 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.omnimerchant.tenant.mapper.TokenUsageDailyMapper">
 
+    <insert id="accumulate">
+        INSERT INTO token_usage_daily
+            (tenant_id, usage_date, model_provider, model_name, model_type,
+             prompt_tokens, completion_tokens, total_tokens, request_count, success_count, total_latency_ms)
+        VALUES
+            (#{usage.tenantId}, #{usage.usageDate}, #{usage.modelProvider}, #{usage.modelName}, 'CHAT',
+             #{usage.promptTokens}, #{usage.completionTokens}, #{usage.totalTokens},
+             #{usage.requestCount}, #{usage.successCount}, #{usage.totalLatencyMs})
+        ON DUPLICATE KEY UPDATE
+            prompt_tokens = COALESCE(prompt_tokens, 0) + VALUES(prompt_tokens),
+            completion_tokens = COALESCE(completion_tokens, 0) + VALUES(completion_tokens),
+            total_tokens = COALESCE(total_tokens, 0) + VALUES(total_tokens),
+            request_count = COALESCE(request_count, 0) + VALUES(request_count),
+            success_count = COALESCE(success_count, 0) + VALUES(success_count),
+            total_latency_ms = COALESCE(total_latency_ms, 0) + VALUES(total_latency_ms),
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+
     <select id="selectByTenantAndDateRange" resultType="com.omnimerchant.tenant.entity.TokenUsageDaily">
         SELECT * FROM token_usage_daily
         WHERE tenant_id = #{tenantId}

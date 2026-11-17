@@ -11,6 +11,9 @@ import java.util.List;
 @Mapper
 public interface TokenUsageDailyMapper extends BaseMapper<TokenUsageDaily> {
 
+    /** Atomically insert or increment the daily rollup under concurrent consumption. */
+    int accumulate(@Param("usage") TokenUsageDaily usage);
+
     /**
      * Query usage for a specific tenant within a date range.
      */

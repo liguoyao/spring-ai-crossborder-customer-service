@@ -87,40 +87,19 @@ public class TokenUsageConsumer implements MessageListener, InitializingBean {
 
         var modelName = event.getModelName() != null ? event.getModelName() : "unknown";
 
-        var existing = mapper.selectByTenantAndDate(event.getTenantId(), usageDate, modelName);
-        if (existing != null) {
-            existing.setPromptTokens(
-                    (existing.getPromptTokens() != null ? existing.getPromptTokens() : 0L)
-                            + event.getPromptTokens());
-            existing.setCompletionTokens(
-                    (existing.getCompletionTokens() != null ? existing.getCompletionTokens() : 0L)
-                            + event.getCompletionTokens());
-            existing.setTotalTokens(
-                    (existing.getTotalTokens() != null ? existing.getTotalTokens() : 0L)
-                            + event.getPromptTokens() + event.getCompletionTokens());
-            existing.setRequestCount(
-                    (existing.getRequestCount() != null ? existing.getRequestCount() : 0) + 1);
-            existing.setTotalLatencyMs(
-                    (existing.getTotalLatencyMs() != null ? existing.getTotalLatencyMs() : 0L)
-                            + event.getLatencyMs());
-            mapper.updateById(existing);
-            log.debug("Updated token usage: tenant={}, date={}, model={}, totalTokens={}",
-                    event.getTenantId(), usageDate, modelName, existing.getTotalTokens());
-        } else {
-            var record = new TokenUsageDaily();
-            record.setTenantId(event.getTenantId());
-            record.setUsageDate(usageDate);
-            record.setModelName(modelName);
-            record.setModelProvider(TokenUsageEvent.resolveProviderName(event.getProviderName(), modelName));
-            record.setPromptTokens((long) event.getPromptTokens());
-            record.setCompletionTokens((long) event.getCompletionTokens());
-            record.setTotalTokens((long) (event.getPromptTokens() + event.getCompletionTokens()));
-            record.setRequestCount(1);
-            record.setSuccessCount(1);
-            record.setTotalLatencyMs(event.getLatencyMs());
-            mapper.insert(record);
-            log.debug("Inserted token usage: tenant={}, date={}, model={}, totalTokens={}",
-                    event.getTenantId(), usageDate, modelName, record.getTotalTokens());
-        }
+        var record = new TokenUsageDaily();
+        record.setTenantId(event.getTenantId());
+        record.setUsageDate(usageDate);
+        record.setModelName(modelName);
+        record.setModelProvider(TokenUsageEvent.resolveProviderName(event.getProviderName(), modelName));
+        record.setPromptTokens((long) event.getPromptTokens());
+        record.setCompletionTokens((long) event.getCompletionTokens());
+        record.setTotalTokens((long) event.getPromptTokens() + event.getCompletionTokens());
+        record.setRequestCount(1);
+        record.setSuccessCount(1);
+        record.setTotalLatencyMs(event.getLatencyMs());
+        mapper.accumulate(record);
+        log.debug("Accumulated token usage: tenant={}, date={}, model={}, totalTokens={}",
+                event.getTenantId(), usageDate, modelName, record.getTotalTokens());
     }
 }
