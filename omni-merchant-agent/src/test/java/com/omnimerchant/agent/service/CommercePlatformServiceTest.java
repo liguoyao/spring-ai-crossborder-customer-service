@@ -82,6 +82,13 @@ class CommercePlatformServiceTest {
     }
 
     @Test
+    void emptyProductSearchDoesNotRunFallbackQuery() {
+        when(productMapper.selectList(any())).thenReturn(java.util.List.of());
+        assertThat(service.searchProductCatalog("shirts", null, null, 5)).isEmpty();
+        verify(productMapper, org.mockito.Mockito.times(1)).selectList(any());
+    }
+
+    @Test
     void createWidgetSessionShouldReturnTenantBoundCustomerToken() {
         var tenant = new Tenant();
         tenant.setId(7L);

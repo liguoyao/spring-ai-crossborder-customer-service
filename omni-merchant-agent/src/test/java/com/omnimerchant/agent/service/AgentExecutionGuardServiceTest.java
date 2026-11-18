@@ -89,6 +89,24 @@ class AgentExecutionGuardServiceTest {
     }
 
     @Test
+    void productSearchIsExecutedOnlyOnceEvenWithDifferentKeywordsAndEmptyResults() {
+        TenantContextHolder.set(1001L);
+        var delegate = callback("searchProductCatalog", "{\"status\":\"NO_MATCH\",\"products\":[]}");
+        var plan = new AgentOrchestratorService.SpecialistPlan(
+                "product", "商品顾问", List.of("searchProductCatalog"), "LOW", false, false, false);
+        var context = new ToolContext(Map.of("tenantId", 1001L, "conversationUuid", "conv-1",
+                "traceId", "trace-1", "allowedTools", List.of("searchProductCatalog")));
+        var guarded = service.guardedCallbacks(new ToolCallback[]{delegate}, plan).getFirst();
+        assertThat(guarded.call("{\"query\":\"shirts\"}", context)).contains("NO_MATCH");
+        assertThat(guarded.call("{\"query\":\"clothing\"}", context)).contains("NO_MATCH");
+        verify(delegate).call("{\"query\":\"shirts\"}", context);
+        verify(delegate, never()).call("{\"query\":\"clothing\"}", context);
+        // A new chat turn gets a new callback and may search again.
+        service.guardedCallbacks(new ToolCallback[]{delegate}, plan).getFirst().call("{}", context);
+        verify(delegate).call("{}", context);
+    }
+
+    @Test
     void missingConfiguredCallbackFailsClosed() {
         var plan = new AgentOrchestratorService.SpecialistPlan(
                 "policy", "政策智能体", List.of("refundPolicyRAG"),

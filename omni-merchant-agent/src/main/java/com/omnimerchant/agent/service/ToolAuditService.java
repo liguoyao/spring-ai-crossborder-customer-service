@@ -42,9 +42,8 @@ public class ToolAuditService {
         }
     }
 
-    private void insert(String toolName, Map<String, Object> params, Object result,
-                        String errorCode, String errorMessage, LocalDateTime started,
-                        String callId) {
+    private void insert(String toolName, Map<String, Object> params, Object result, String errorCode,
+                        String errorMessage, LocalDateTime started, String callId) {
         if (mapper == null) {
             return;
         }
@@ -69,7 +68,7 @@ public class ToolAuditService {
             log.setErrorMessage(errorMessage);
             log.setStartedAt(started);
             log.setEndedAt(ended);
-            log.setLatencyMs((int) Duration.between(started, ended).toMillis());
+            log.setLatencyMs((int)Duration.between(started, ended).toMillis());
             log.setCacheHit(0);
             log.setRetryCount(0);
             log.setIsRetry(0);
@@ -81,6 +80,10 @@ public class ToolAuditService {
     }
 
     private String resolveTraceId() {
+        var context = CallContextHolder.get();
+        if (context != null && context.traceId() != null && !context.traceId().isBlank()) {
+            return context.traceId();
+        }
         var traceId = MDC.get("traceId");
         return traceId == null || traceId.isBlank() ? UUID.randomUUID().toString() : traceId;
     }

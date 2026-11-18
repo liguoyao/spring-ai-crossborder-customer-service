@@ -23,29 +23,30 @@ public class ProductTools {
     private final ToolAuditService toolAuditService;
 
     @Tool(description = """
-            Search the tenant product catalog for ecommerce product advice. \
-            Use this when customers ask about product recommendations, inventory, price, SKU, variants, \
-            category fit, or buying guidance. Returns structured product cards from the tenant cache.
-            """)
+        Search the tenant product catalog for ecommerce product advice. \
+        Use this when customers ask about product recommendations, inventory, price, SKU, variants, \
+        category fit, or buying guidance. Returns structured product cards from the tenant cache.
+        Call at most once per user turn. For a general catalog listing use an empty query.
+        If the result is empty, tell the customer no matching products were found and stop.
+        Never retry with different keywords, categories, or price filters in the same turn.
+        """)
     public ProductSearchResult searchProductCatalog(
-            @ToolParam(description = "Customer product query or keywords") String query,
-            @ToolParam(description = "Optional category or product type", required = false) String category,
-            @ToolParam(description = "Optional max price in store currency", required = false) BigDecimal maxPrice,
-            @ToolParam(description = "Maximum number of products to return", required = false) Integer limit) {
+        @ToolParam(description = "Customer product query or keywords") String query,
+        @ToolParam(description = "Optional category or product type", required = false) String category,
+        @ToolParam(description = "Optional max price in store currency", required = false) BigDecimal maxPrice,
+        @ToolParam(description = "Maximum number of products to return", required = false) Integer limit) {
         if (TenantContextHolder.get() == null) {
             return new ProductSearchResult("MISSING_TENANT_CONTEXT", List.of(),
-                    "Product search requires a verified tenant context.");
+                "Product search requires a verified tenant context.");
         }
         return toolAuditService.record("searchProductCatalog",
-                params("query", query, "category", category, "maxPrice", maxPrice),
-                () -> {
-                    var products = commerceService.searchProductCatalog(query, maxPrice, category,
-                            limit == null ? 5 : limit);
-                    return new ProductSearchResult(products.isEmpty() ? "NO_MATCH" : "OK", products,
-                            products.isEmpty()
-                                    ? "No matching products were found in this tenant catalog."
-                                    : "Products come from the tenant catalog cache.");
-                });
+            params("query", query, "category", category, "maxPrice", maxPrice), () -> {
+                var products =
+                    commerceService.searchProductCatalog(query, maxPrice, category, limit == null ? 5 : limit);
+                return new ProductSearchResult(products.isEmpty() ? "NO_MATCH" : "OK", products, products.isEmpty()
+                    ? "No matching products were found. This search is final for this turn; do not search again."
+                    : "Products come from the tenant catalog cache.");
+            });
     }
 
     private Map<String, Object> params(Object... entries) {
@@ -56,9 +57,7 @@ public class ProductTools {
         return map;
     }
 
-    public record ProductSearchResult(
-            String status,
-            List<CommercePlatformService.ProductRecommendation> products,
-            String message) {
+    public record ProductSearchResult(String status, List<CommercePlatformService.ProductRecommendation> products,
+                                      String message) {
     }
 }

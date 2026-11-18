@@ -1,10 +1,12 @@
 package com.omnimerchant.agent.service;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.omnimerchant.agent.context.CallContextHolder;
 import com.omnimerchant.agent.entity.AgentIdempotencyGuard;
 import com.omnimerchant.agent.mapper.AgentIdempotencyGuardMapper;
 import com.omnimerchant.tenant.context.TenantContextHolder;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.MDC;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.ToolDefinition;
@@ -17,24 +19,19 @@ import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HexFormat;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
+import java.util.function.Supplier;
 
 @Service
 @RequiredArgsConstructor
 public class AgentExecutionGuardService {
 
     private static final Duration LOCK_TTL = Duration.ofSeconds(90);
-    private static final Set<String> SIDE_EFFECT_TOOLS = Set.of(
-            "createReturnRequest", "requestRefundOrReplacement", "requestAddressChange", "escalateToHuman");
+    private static final Set<String> SIDE_EFFECT_TOOLS =
+        Set.of("createReturnRequest", "requestRefundOrReplacement", "requestAddressChange", "escalateToHuman");
     private static final DefaultRedisScript<Long> RELEASE_SCRIPT = new DefaultRedisScript<>(
-            "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
-            Long.class);
+        "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+        Long.class);
 
     private final StringRedisTemplate redisTemplate;
     private final AgentIdempotencyGuardMapper idempotencyGuardMapper;
@@ -70,22 +67,19 @@ public class AgentExecutionGuardService {
         }
     }
 
-    public List<ToolCallback> guardedCallbacks(ToolCallback[] callbacks,
-                                               AgentOrchestratorService.SpecialistPlan plan) {
-        var callbackByName = Arrays.stream(callbacks)
-                .collect(java.util.stream.Collectors.toMap(
-                        callback -> callback.getToolDefinition().name(), callback -> callback));
+    public List<ToolCallback> guardedCallbacks(ToolCallback[] callbacks, AgentOrchestratorService.SpecialistPlan plan) {
+        var callbackByName = Arrays.stream(callbacks).collect(
+            java.util.stream.Collectors.toMap(callback -> callback.getToolDefinition().name(), callback -> callback));
         var missing = plan.toolAllowlist().stream().filter(name -> !callbackByName.containsKey(name)).toList();
         if (!missing.isEmpty()) {
             throw new IllegalStateException("Configured specialist tools are missing: " + missing);
         }
-        return plan.toolAllowlist().stream()
-                .map(callbackByName::get)
-                .map(callback -> (ToolCallback) new GuardedToolCallback(callback))
-                .toList();
+        return plan.toolAllowlist().stream().map(callbackByName::get)
+            .map(callback -> (ToolCallback)new GuardedToolCallback(callback)).toList();
     }
 
-    private String executeGuarded(ToolCallback delegate, String toolInput, ToolContext toolContext) {
+    private String executeGuarded(ToolCallback delegate, String toolInput, ToolContext toolContext,
+                                  Supplier<String> invocation) {
         var context = toolContext == null ? Map.<String, Object>of() : toolContext.getContext();
         var toolName = delegate.getToolDefinition().name();
         var tenantId = number(context.get("tenantId"));
@@ -97,17 +91,42 @@ public class AgentExecutionGuardService {
         if (conversationUuid == null || conversationUuid.isBlank() || !allowedTools.contains(toolName)) {
             throw new SecurityException("Tool execution rejected by the specialist allowlist");
         }
+        var previousCall = CallContextHolder.get();
+        var previousTrace = MDC.get("traceId");
+        try {
+            CallContextHolder.set(string(context.get("intent")), conversationUuid, traceId);
+            if (traceId == null || traceId.isBlank()) {
+                MDC.remove("traceId");
+            } else {
+                MDC.put("traceId", traceId);
+            }
+            return executeWithContext(invocation, toolInput, toolName, tenantId, conversationUuid, traceId);
+        } finally {
+            if (previousCall == null) {
+                CallContextHolder.clear();
+            } else {
+                CallContextHolder.set(previousCall.intent(), previousCall.conversationUuid(), previousCall.traceId());
+            }
+            if (previousTrace == null) {
+                MDC.remove("traceId");
+            } else {
+                MDC.put("traceId", previousTrace);
+            }
+        }
+    }
+
+    private String executeWithContext(Supplier<String> invocation, String toolInput, String toolName, Long tenantId,
+                                      String conversationUuid, String traceId) {
         if (!SIDE_EFFECT_TOOLS.contains(toolName)) {
-            return delegate.call(toolInput, toolContext);
+            return invocation.get();
         }
 
         var guardKey = toolName + ":" + sha256(toolInput).substring(0, 32);
         if (!beginSideEffect(tenantId, conversationUuid, guardKey, toolName, toolInput)) {
-            return "{\"status\":\"DUPLICATE_BLOCKED\",\"tool\":\"" + toolName
-                    + "\",\"message\":\"The same side-effect request was already recorded.\"}";
+            return "{\"status\":\"DUPLICATE_BLOCKED\",\"tool\":\"" + toolName + "\",\"message\":\"The same side-effect request was already recorded.\"}";
         }
         try {
-            var output = delegate.call(toolInput, toolContext);
+            var output = invocation.get();
             updateGuard(tenantId, conversationUuid, guardKey, "COMPLETED");
             stateMachineService.toolSucceeded(tenantId, conversationUuid, traceId, toolName, output);
             return output;
@@ -117,8 +136,8 @@ public class AgentExecutionGuardService {
         }
     }
 
-    private boolean beginSideEffect(Long tenantId, String conversationUuid, String guardKey,
-                                    String toolName, String toolInput) {
+    private boolean beginSideEffect(Long tenantId, String conversationUuid, String guardKey, String toolName,
+                                    String toolInput) {
         var guard = new AgentIdempotencyGuard();
         guard.setTenantId(tenantId);
         guard.setConversationUuid(conversationUuid);
@@ -135,11 +154,10 @@ public class AgentExecutionGuardService {
     }
 
     private void updateGuard(Long tenantId, String conversationUuid, String guardKey, String status) {
-        idempotencyGuardMapper.update(null, new LambdaUpdateWrapper<AgentIdempotencyGuard>()
-                .eq(AgentIdempotencyGuard::getTenantId, tenantId)
+        idempotencyGuardMapper.update(null,
+            new LambdaUpdateWrapper<AgentIdempotencyGuard>().eq(AgentIdempotencyGuard::getTenantId, tenantId)
                 .eq(AgentIdempotencyGuard::getConversationUuid, conversationUuid)
-                .eq(AgentIdempotencyGuard::getGuardKey, guardKey)
-                .set(AgentIdempotencyGuard::getStatus, status));
+                .eq(AgentIdempotencyGuard::getGuardKey, guardKey).set(AgentIdempotencyGuard::getStatus, status));
     }
 
     private void requireTenant(Long tenantId) {
@@ -164,7 +182,7 @@ public class AgentExecutionGuardService {
     private String sha256(String value) {
         try {
             var bytes = MessageDigest.getInstance("SHA-256")
-                    .digest((value == null ? "" : value).getBytes(StandardCharsets.UTF_8));
+                .digest((value == null ? "" : value).getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(bytes);
         } catch (Exception e) {
             throw new IllegalStateException("Unable to hash tool request", e);
@@ -176,6 +194,10 @@ public class AgentExecutionGuardService {
 
     private final class GuardedToolCallback implements ToolCallback {
         private final ToolCallback delegate;
+        // A new callback is created for each chat turn and reused across model tool rounds/retries.
+        private boolean productSearchAttempted;
+        private String productSearchResult;
+        private RuntimeException productSearchFailure;
 
         private GuardedToolCallback(ToolCallback delegate) {
             this.delegate = delegate;
@@ -198,7 +220,25 @@ public class AgentExecutionGuardService {
 
         @Override
         public String call(String toolInput, ToolContext toolContext) {
-            return executeGuarded(delegate, toolInput, toolContext);
+            return executeGuarded(delegate, toolInput, toolContext, () -> invoke(toolInput, toolContext));
+        }
+
+        private synchronized String invoke(String toolInput, ToolContext toolContext) {
+            if (!"searchProductCatalog".equals(delegate.getToolDefinition().name())) {
+                return delegate.call(toolInput, toolContext);
+            }
+            if (!productSearchAttempted) {
+                productSearchAttempted = true;
+                try {
+                    productSearchResult = delegate.call(toolInput, toolContext);
+                } catch (RuntimeException error) {
+                    productSearchFailure = error;
+                }
+            }
+            if (productSearchFailure != null) {
+                throw productSearchFailure;
+            }
+            return productSearchResult;
         }
     }
 }
