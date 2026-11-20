@@ -3,8 +3,8 @@
     <a-alert
       type="info"
       show-icon
-      message="确定性 Supervisor-Worker 编排"
-      description="后端按意图选择 specialist，并在请求级限定工具白名单；不使用开放式多 Agent 群聊。"
+      :message="a2a?.enabled ? 'Supervisor 与 specialist 通过 A2A 协作' : '确定性 Supervisor-Worker 编排'"
+      :description="a2a?.enabled ? `物流异常售后采用 HTTP A2A ${a2a.protocol}，当前模式：${a2a.mode}；退款和补发进入人工审批。` : 'A2A 未开启；后端按意图选择 specialist，并在请求级限定工具白名单。'"
     />
     <PageToolbar class="section-row"
       ><a-select v-model:value="intent" style="width: 190px"
@@ -74,11 +74,14 @@
         </div>
       </div>
     </section>
+    <A2aTaskPanel />
   </div>
 </template>
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import api from "@/api";
+import A2aTaskPanel from '@/components/admin/A2aTaskPanel.vue';
+const a2a = ref<{ enabled: boolean; protocol: string; mode: string } | null>(null);
 import PageToolbar from "@/components/admin/PageToolbar.vue";
 import StatusTag from "@/components/admin/StatusTag.vue";
 import BackendEmptyState from "@/components/admin/BackendEmptyState.vue";
@@ -102,6 +105,7 @@ async function load() {
   loading.value = true;
   try {
     workflow.value = (await api.get("/agent/workflow")).data;
+    a2a.value = (await api.get('/agent/a2a/status')).data;
   } finally {
     loading.value = false;
   }

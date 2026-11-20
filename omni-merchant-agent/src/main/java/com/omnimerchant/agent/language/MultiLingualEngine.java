@@ -57,6 +57,10 @@ public class MultiLingualEngine {
         return postprocessDetailed(englishResponse, targetLang).translatedText();
     }
 
+    public TranslationResult translateResponseDetailed(String response, String sourceLang, String targetLang) {
+        return translationService.translateDetailed(response, sourceLang, targetLang);
+    }
+
     public TranslationResult postprocessDetailed(String englishResponse, String targetLang) {
         if (!languageDetector.needsTranslation(targetLang)) {
             return new TranslationResult(englishResponse, englishResponse, "en", targetLang,

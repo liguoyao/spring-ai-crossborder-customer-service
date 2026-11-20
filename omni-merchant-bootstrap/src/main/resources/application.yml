@@ -208,3 +208,10 @@ logging:
   level:
     root: INFO
     com.omnimerchant: INFO
+
+agent:
+  a2a:
+    enabled: ${A2A_ENABLED}
+    fixture: false
+    secret: ${A2A_SERVICE_SECRET}
+    base-url: ${A2A_BASE_URL}

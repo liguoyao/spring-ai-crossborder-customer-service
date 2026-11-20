@@ -52,6 +52,13 @@ public class ReActAgentService {
     private final AgentStateMachineService agentStateMachineService;
     private final TranslationEvidenceService translationEvidenceService;
     private ObservationRegistry observationRegistry = ObservationRegistry.NOOP;
+    private com.omnimerchant.agent.a2a.A2aSupervisor a2aSupervisor;
+
+    @Autowired(required = false)
+    void setA2aSupervisor(com.omnimerchant.agent.a2a.A2aSupervisor supervisor) {
+        this.a2aSupervisor = supervisor;
+    }
+
     private static final Duration LLM_STREAM_TIMEOUT = Duration.ofSeconds(70);
 
     private static final String SYSTEM_PROMPT = """
@@ -181,6 +188,21 @@ public class ReActAgentService {
                     "latencyMs", processed.getTranslationLatencyMs(), "fallbackReason",
                     processed.getFallbackReason() == null ? "" : processed.getFallbackReason(), "originalLength",
                     safeInput.length(), "translatedLength", enText.length()));
+        }
+
+        if (a2aSupervisor != null && a2aSupervisor.accepts(tenantId, conversationUuid, userMessage)) {
+            chatMemory.add(conversationUuid, List.of(new UserMessage(enText)));
+            return a2aSupervisor.chat(tenantId, conversationUuid, userMessage, traceId).map(event -> {
+                if (!"final".equals(event.type())) {
+                    return event;
+                }
+                var translation = multiLingualEngine.translateResponseDetailed(event.data(), "zh", originalLang);
+                translationEvidenceService.recordOutput(conversationUuid, traceId, translation);
+                chatMemory.add(conversationUuid, List.of(new AssistantMessage(translation.translatedText())));
+                agentTraceService.completeRun(traceId, translation.translatedText(), null,
+                    (int)(System.currentTimeMillis() - traceStartedAt));
+                return ChatStreamEvent.finalAnswer(translation.translatedText());
+            });
         }
 
         if (!routed.available()) {

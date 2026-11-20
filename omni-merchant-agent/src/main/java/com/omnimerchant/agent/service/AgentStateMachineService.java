@@ -66,6 +66,15 @@ public class AgentStateMachineService {
     }
 
     @Transactional
+    public void requireCustomerInput(Long tenantId, String conversationUuid, String traceId, boolean identity) {
+        requireTenant(tenantId);
+        var current = find(tenantId, conversationUuid);
+        if (current != null && AI_WORKING.equals(current.getState()))
+            transition(current, identity ? NEEDS_CUSTOMER_VERIFY : WAITING_CUSTOMER, traceId,
+                    "A2A", "input_required", "Specialist requires customer input");
+    }
+
+    @Transactional
     public void failRun(Long tenantId, String conversationUuid, String traceId, String reason) {
         requireTenant(tenantId);
         var current = find(tenantId, conversationUuid);

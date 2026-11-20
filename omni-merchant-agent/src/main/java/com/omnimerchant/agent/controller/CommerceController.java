@@ -1,15 +1,10 @@
 package com.omnimerchant.agent.controller;
 
-import com.omnimerchant.agent.dto.EvalDtos;
-import com.omnimerchant.agent.dto.IntegrationDtos;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.omnimerchant.agent.dto.CommerceDtos;
-import com.omnimerchant.agent.service.AgentEvalRunnerService;
-import com.omnimerchant.agent.service.AgentEvalDatasetService;
-import com.omnimerchant.agent.service.CommercePlatformService;
-import com.omnimerchant.agent.service.ReActAgentService;
-import com.omnimerchant.agent.service.ShopifyIntegrationService;
+import com.omnimerchant.agent.dto.EvalDtos;
+import com.omnimerchant.agent.dto.IntegrationDtos;
+import com.omnimerchant.agent.service.*;
 import com.omnimerchant.common.dto.R;
 import com.omnimerchant.common.exception.ErrorCode;
 import com.omnimerchant.common.util.JwtUtil;
@@ -25,15 +20,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.scheduler.Schedulers;
 
@@ -58,8 +45,7 @@ public class CommerceController {
     private final JwtUtil jwtUtil;
 
     @GetMapping("/customers")
-    public R<?> customers(@RequestParam(required = false) String keyword,
-                          @RequestParam(defaultValue = "1") int page,
+    public R<?> customers(@RequestParam(required = false) String keyword, @RequestParam(defaultValue = "1") int page,
                           @RequestParam(defaultValue = "20") int size) {
         return R.ok(commerceService.listCustomers(keyword, page, size));
     }
@@ -70,10 +56,8 @@ public class CommerceController {
     }
 
     @GetMapping("/orders")
-    public R<?> orders(@RequestParam(required = false) String keyword,
-                       @RequestParam(required = false) String status,
-                       @RequestParam(defaultValue = "1") int page,
-                       @RequestParam(defaultValue = "20") int size) {
+    public R<?> orders(@RequestParam(required = false) String keyword, @RequestParam(required = false) String status,
+                       @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size) {
         return R.ok(commerceService.listOrders(keyword, status, page, size));
     }
 
@@ -89,8 +73,7 @@ public class CommerceController {
 
     @GetMapping("/products")
     public R<?> products(@RequestParam(required = false) String keyword,
-                         @RequestParam(required = false) String category,
-                         @RequestParam(defaultValue = "1") int page,
+                         @RequestParam(required = false) String category, @RequestParam(defaultValue = "1") int page,
                          @RequestParam(defaultValue = "20") int size) {
         return R.ok(commerceService.listProducts(keyword, category, page, size));
     }
@@ -107,8 +90,7 @@ public class CommerceController {
     }
 
     @GetMapping("/escalations")
-    public R<?> escalations(@RequestParam(required = false) Integer status,
-                            @RequestParam(defaultValue = "1") int page,
+    public R<?> escalations(@RequestParam(required = false) Integer status, @RequestParam(defaultValue = "1") int page,
                             @RequestParam(defaultValue = "20") int size) {
         return R.ok(commerceService.listEscalations(status, page, size));
     }
@@ -134,8 +116,7 @@ public class CommerceController {
 
     @GetMapping("/tool-calls")
     public R<?> toolCalls(@RequestParam(required = false) String toolName,
-                          @RequestParam(required = false) Integer success,
-                          @RequestParam(defaultValue = "1") int page,
+                          @RequestParam(required = false) Integer success, @RequestParam(defaultValue = "1") int page,
                           @RequestParam(defaultValue = "20") int size) {
         return R.ok(commerceService.listToolCalls(toolName, success, page, size));
     }
@@ -146,8 +127,7 @@ public class CommerceController {
     }
 
     @GetMapping("/evals")
-    public R<?> evals(@RequestParam(defaultValue = "1") int page,
-                      @RequestParam(defaultValue = "20") int size) {
+    public R<?> evals(@RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size) {
         return R.ok(commerceService.evalSummary(page, size));
     }
 
@@ -158,8 +138,7 @@ public class CommerceController {
     }
 
     @GetMapping("/evals/runs")
-    public R<?> evalRuns(@RequestParam(defaultValue = "1") int page,
-                         @RequestParam(defaultValue = "20") int size) {
+    public R<?> evalRuns(@RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size) {
         return R.ok(evalRunnerService.listRuns(page, size));
     }
 
@@ -171,8 +150,7 @@ public class CommerceController {
     @GetMapping("/evals/gold/cases")
     public R<?> goldEvalCases(@RequestParam(required = false) String datasetVersion,
                               @RequestParam(required = false) String annotationStatus,
-                              @RequestParam(defaultValue = "1") int page,
-                              @RequestParam(defaultValue = "20") int size) {
+                              @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size) {
         return R.ok(evalDatasetService.listGoldCases(datasetVersion, annotationStatus, page, size));
     }
 
@@ -185,15 +163,14 @@ public class CommerceController {
     @PostMapping("/evals/gold/cases/{sourceCaseId}/copy")
     @PreAuthorize("@tenantAuthorization.hasPermission('eval:gold:manage')")
     public R<?> copyGoldEvalCase(@PathVariable Long sourceCaseId,
-                                @RequestBody EvalDtos.GoldEvalCaseCopyRequest request) {
+                                 @RequestBody EvalDtos.GoldEvalCaseCopyRequest request) {
         return R.ok(evalDatasetService.copyAsGoldDraft(sourceCaseId, request));
     }
 
     @PostMapping("/evals/gold/cases/{id}/review")
     @PreAuthorize("@tenantAuthorization.hasPermission('eval:gold:manage')")
-    public R<?> reviewGoldEvalCase(@PathVariable Long id,
-                                  @RequestBody EvalDtos.GoldEvalCaseReviewRequest request,
-                                  @AuthenticationPrincipal JwtPrincipal principal) {
+    public R<?> reviewGoldEvalCase(@PathVariable Long id, @RequestBody EvalDtos.GoldEvalCaseReviewRequest request,
+                                   @AuthenticationPrincipal JwtPrincipal principal) {
         return R.ok(evalDatasetService.reviewGoldCase(id, request, requireUserId(principal)));
     }
 
@@ -204,8 +181,7 @@ public class CommerceController {
     }
 
     @GetMapping("/rag/evals/runs")
-    public R<?> ragEvalRuns(@RequestParam(defaultValue = "1") int page,
-                            @RequestParam(defaultValue = "20") int size) {
+    public R<?> ragEvalRuns(@RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size) {
         return R.ok(evalRunnerService.listRuns(page, size));
     }
 
@@ -221,30 +197,25 @@ public class CommerceController {
 
     @PostMapping(value = "/widget/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter widgetChat(
-            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
-            @RequestBody CommerceDtos.WidgetChatRequest request,
-            HttpServletResponse response) throws IOException {
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+        @RequestBody CommerceDtos.WidgetChatRequest request, HttpServletResponse response) throws IOException {
         var principal = parseWidgetPrincipal(authorization);
         if (principal == null) {
-            writeWidgetError(response, HttpStatus.UNAUTHORIZED, ErrorCode.UNAUTHORIZED,
-                    "缺少或无效的 widget 会话令牌");
+            writeWidgetError(response, HttpStatus.UNAUTHORIZED, ErrorCode.UNAUTHORIZED, "缺少或无效的 widget 会话令牌");
             return null;
         }
-        if (!Objects.equals(principal.tenantCode(), request.tenantCode())
-                || !Objects.equals(principal.conversationUuid(), request.conversationUuid())) {
+        if (!Objects.equals(principal.tenantCode(), request.tenantCode()) || !Objects.equals(
+            principal.conversationUuid(), request.conversationUuid())) {
             log.warn("Widget token mismatch: tokenTenant={}, requestTenant={}, tokenConv={}, requestConv={}",
-                    principal.tenantCode(), request.tenantCode(),
-                    principal.conversationUuid(), request.conversationUuid());
-            writeWidgetError(response, HttpStatus.FORBIDDEN, ErrorCode.FORBIDDEN,
-                    "widget 会话令牌与当前会话不匹配");
+                principal.tenantCode(), request.tenantCode(), principal.conversationUuid(), request.conversationUuid());
+            writeWidgetError(response, HttpStatus.FORBIDDEN, ErrorCode.FORBIDDEN, "widget 会话令牌与当前会话不匹配");
             return null;
         }
 
         var previous = TenantContextHolder.get();
         try {
             TenantContextHolder.set(principal.tenantId());
-            return streamChat(principal.tenantId(), request.conversationUuid(),
-                    request.message(), request.intent());
+            return streamChat(principal.tenantId(), request.conversationUuid(), request.message(), request.intent());
         } finally {
             if (previous == null) {
                 TenantContextHolder.clear();
@@ -269,7 +240,7 @@ public class CommerceController {
     @GetMapping("/integrations/shopify/oauth/callback")
     public R<?> shopifyOAuthCallback(HttpServletRequest request) {
         var params = request.getParameterMap().entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().length == 0 ? "" : e.getValue()[0]));
+            .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().length == 0 ? "" : e.getValue()[0]));
         return R.ok(shopifyService.completeOAuthCallback(params));
     }
 
@@ -280,8 +251,7 @@ public class CommerceController {
     }
 
     @GetMapping("/integrations/shopify/jobs")
-    public R<?> shopifyJobs(@RequestParam(defaultValue = "1") int page,
-                            @RequestParam(defaultValue = "20") int size) {
+    public R<?> shopifyJobs(@RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size) {
         return R.ok(shopifyService.listJobs(page, size));
     }
 
@@ -334,9 +304,8 @@ public class CommerceController {
     }
 
     @PostMapping("/webhooks/shopify")
-    public ResponseEntity<R<?>> shopifyWebhook(@RequestHeader HttpHeaders headers,
-                                                @RequestBody String body,
-                                                HttpServletRequest request) throws Exception {
+    public ResponseEntity<R<?>> shopifyWebhook(@RequestHeader HttpHeaders headers, @RequestBody String body,
+                                               HttpServletRequest request) throws Exception {
         var shopDomain = first(headers, "X-Shopify-Shop-Domain");
         var topic = first(headers, "X-Shopify-Topic");
         var eventUuid = first(headers, "X-Shopify-Webhook-Id");
@@ -348,51 +317,42 @@ public class CommerceController {
         }
         var valid = shopifyService.verifyWebhook(webhookSecret, body, signature);
         var event = commerceService.recordWebhook(tenant,
-                eventUuid == null || eventUuid.isBlank() ? shopDomain + ":" + topic + ":" + body.hashCode() : eventUuid,
-                topic,
-                objectMapper.writeValueAsString(headers),
-                signature,
-                valid,
-                body,
-                request.getRemoteAddr());
+            eventUuid == null || eventUuid.isBlank() ? shopDomain + ":" + topic + ":" + body.hashCode() : eventUuid,
+            topic, objectMapper.writeValueAsString(headers), signature, valid, body, request.getRemoteAddr());
         if (!valid) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(R.fail("C001", "Shopify webhook signature verification failed"));
+                .body(R.fail("C001", "Shopify webhook signature verification failed"));
         }
         var processed = shopifyService.processWebhookEvent(event.getId());
-        return ResponseEntity.ok(R.ok(Map.of("eventId", event.getId(), "status", "accepted", "processor", processed.status())));
+        return ResponseEntity.ok(
+            R.ok(Map.of("eventId", event.getId(), "status", "accepted", "processor", processed.status())));
     }
 
     private SseEmitter streamChat(Long tenantId, String conversationUuid, String message, String intent) {
         var emitter = new SseEmitter(300_000L);
         var safeIntent = intent == null || intent.isBlank() ? "UNKNOWN" : intent;
         reActAgentService.chatEvents(tenantId, conversationUuid, message, safeIntent)
-                .subscribeOn(Schedulers.boundedElastic())
-                .subscribe(
-                        event -> {
-                            try {
-                                emitter.send(SseEmitter.event().name(event.type()).data(event.data()));
-                            } catch (Exception e) {
-                                emitter.completeWithError(e);
-                            }
-                        },
-                        error -> {
-                            try {
-                                emitter.send(SseEmitter.event().name("error").data(error.getMessage()));
-                            } catch (Exception ex) {
-                                log.warn("Failed to send widget error event: {}", ex.getMessage());
-                            }
-                            emitter.complete();
-                        },
-                        () -> {
-                            emitter.complete();
-                        }
-                );
+            .subscribeOn(Schedulers.boundedElastic()).subscribe(event -> {
+                try {
+                    emitter.send(SseEmitter.event().name(event.type()).data(event.data()));
+                } catch (Exception e) {
+                    emitter.completeWithError(e);
+                }
+            }, error -> {
+                try {
+                    emitter.send(SseEmitter.event().name("error").data(error.getMessage()));
+                } catch (Exception ex) {
+                    log.warn("Failed to send widget error event: {}", ex.getMessage());
+                }
+                emitter.complete();
+            }, () -> {
+                emitter.complete();
+            });
         return emitter;
     }
 
-    private void writeWidgetError(HttpServletResponse response, HttpStatus status,
-                                  ErrorCode errorCode, String message) throws IOException {
+    private void writeWidgetError(HttpServletResponse response, HttpStatus status, ErrorCode errorCode, String message)
+        throws IOException {
         response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());

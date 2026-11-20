@@ -10,6 +10,9 @@ import java.util.Locale;
 
 @Service
 public class AgentOrchestratorService {
+    private com.omnimerchant.agent.a2a.A2aConfiguration.Properties a2a;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setA2aProperties(com.omnimerchant.agent.a2a.A2aConfiguration.Properties properties) { this.a2a = properties; }
 
     public SpecialistPlan plan(String intent, String userMessage) {
         var normalizedIntent = intent == null ? "UNKNOWN" : intent.toUpperCase(Locale.ROOT);
@@ -39,7 +42,7 @@ public class AgentOrchestratorService {
     }
 
     public GovernanceDtos.AgentWorkflowVO describeWorkflow() {
-        var nodes = List.of(
+        var nodes = new java.util.ArrayList<>(List.of(
                 node("triage", "意图分流", "识别语言、意图、风险和是否需要身份校验", "detectLanguage, classifyIntent", "IMPLEMENTED"),
                 node("order", "订单智能体", "订单查询、身份校验和物流状态解释", "queryOrder, trackLogistics", "BACKED_BY_TOOLS"),
                 node("return", "退货/退款智能体", "创建审批请求，不直接执行外部退款或取消", "createReturnRequest, requestRefundOrReplacement, requestAddressChange", "APPROVAL_GATED"),
@@ -48,14 +51,21 @@ public class AgentOrchestratorService {
                 node("risk", "安全智能体", "prompt injection、越权、敏感信息和危险动作拦截", "safetyGate", "ENFORCED"),
                 node("handoff", "人工交接智能体", "生成工单、摘要和 SLA 队列", "escalateToHuman", "BACKED_BY_TICKETS"),
                 node("qa", "质检智能体", "关闭会话后进入 QA 队列和评测回归", "qaReview", "PARTIAL")
-        );
+        ));
+        if (a2a != null && a2a.isEnabled()) {
+            nodes.add(node("a2a-supervisor", "A2A 客服协调", "物流异常售后任务分派、证据门禁和统一回复", "A2A HTTP client", "CONFIGURED"));
+            nodes.add(node("order-logistics", "A2A 订单物流", "独立任务上下文；验证订单归属并查询物流", "queryOrder, trackLogistics", "CONFIGURED"));
+            nodes.add(node("policy", "A2A 政策", "引用政策证据并判断人工审批申请的适用条件", "refundPolicyRAG", "CONFIGURED"));
+            nodes.add(node("after-sales", "A2A 售后", "基于可信任务证据创建幂等内部审批申请", "requestRefundOrReplacement", "CONFIGURED"));
+        }
         var policies = List.of(
                 new GovernanceDtos.AgentPolicyVO("tool_allowlist", "不同 specialist 只能调用自己的工具集合", "AgentOrchestratorService.plan"),
                 new GovernanceDtos.AgentPolicyVO("approval_gate", "退款、补发、改地址、取消订单进入人工审批", "commerce_action_request / return_request"),
                 new GovernanceDtos.AgentPolicyVO("tenant_fail_closed", "缺租户上下文、跨租户访问和 widget token mismatch 拒绝", "TenantInterceptor + JWT claims"),
                 new GovernanceDtos.AgentPolicyVO("trace_replay", "每次路由、工具调用、RAG、失败归因可回放", "agent_run / agent_step / tool_call_log")
         );
-        return new GovernanceDtos.AgentWorkflowVO("Supervisor-Worker 客服工作流", "ORCHESTRATOR_BACKBONE", nodes, policies);
+        return new GovernanceDtos.AgentWorkflowVO("Supervisor-Worker 客服工作流",
+                a2a != null && a2a.isEnabled() ? "A2A_SUPERVISOR" : "ORCHESTRATOR_BACKBONE", nodes, policies);
     }
 
     private GovernanceDtos.AgentNodeVO node(String key, String label, String responsibility, String tools, String status) {

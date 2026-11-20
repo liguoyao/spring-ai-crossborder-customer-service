@@ -18,7 +18,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .addPathPatterns("/api/**")
                 .excludePathPatterns("/api/health", "/api/tenants", "/api/auth/**", "/api/admin/**",
                         "/api/widget/**", "/api/webhooks/**",
-                        "/api/public/**",
+                        "/api/public/**", "/api/a2a/**",
                         "/api/integrations/shopify/oauth/callback");
     }
 }

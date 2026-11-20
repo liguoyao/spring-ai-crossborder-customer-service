@@ -9,6 +9,8 @@
 
 OmniMerchant 不是只接一个模型的聊天 Demo。它把买家咨询、商家客服工作台、订单与物流工具、人工接管、Evidence-Grade RAG、Agent 评测、轨迹回放、多租户安全和渠道连接器放进同一套可复现工程中。
 
+物流异常售后支持 Supervisor 与订单物流、政策、售后三个 specialist 通过真实 HTTP A2A 1.0 协作；使用官方 Java SDK 1.5.0.Final，提供持久化任务、租户服务鉴权和通信回放。启动配置、Fixture 边界和验证方式见 [A2A 协作说明](docs/a2a-collaboration.md)。
+
 > 当前定位：**开源旗舰版 + 商业 Beta 候选**。无外部凭据即可运行完整 Fixture 演示；企业微信、抖店和 Shopify 的真实连接状态会被明确区分，不把 Fixture 冒充生产接入。
 
 [快速启动](#5-分钟启动) · [工程架构](#工程架构) · [评测证据](#可核验的技术证据) · [API](docs/openapi.yaml) · [发布边界](docs/v4-release-checklist.md) · [简历写法](#简历写法)
@@ -66,7 +68,7 @@ cd spring-ai-crossborder-customer-service
 Copy-Item .env.example .env
 notepad .env
 # 至少设置数据库密码、ADMIN_EMAIL、ADMIN_PASSWORD、JWT_SECRET、
-# INTEGRATION_ENCRYPTION_KEY；仓库不提供可部署默认口令。
+# INTEGRATION_ENCRYPTION_KEY、A2A_SERVICE_SECRET；仓库不提供可部署默认口令。
 
 .\scripts\demo.ps1
 ```

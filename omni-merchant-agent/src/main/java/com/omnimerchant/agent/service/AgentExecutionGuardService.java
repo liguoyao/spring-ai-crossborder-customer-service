@@ -115,6 +115,17 @@ public class AgentExecutionGuardService {
         }
     }
 
+    /** Trusted specialist adapter; remote messages never supply tool names or the allowlist. */
+    public String executeA2aApproval(Long tenantId, String conversationUuid, String traceId, String canonicalInput,
+                                     Supplier<String> invocation) {
+        requireTenant(tenantId);
+        if (conversationUuid == null || conversationUuid.isBlank()) {
+            throw new SecurityException("Conversation required");
+        }
+        return executeWithContext(invocation, canonicalInput, "requestRefundOrReplacement", tenantId, conversationUuid,
+            traceId);
+    }
+
     private String executeWithContext(Supplier<String> invocation, String toolInput, String toolName, Long tenantId,
                                       String conversationUuid, String traceId) {
         if (!SIDE_EFFECT_TOOLS.contains(toolName)) {

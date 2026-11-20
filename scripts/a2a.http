@@ -1,0 +1,395 @@
+# A2A 多智能体通信演示：使用 IntelliJ IDEA 自带的 HTTP Client 执行。
+#
+# 【准备环境】
+# 1. 后端设置 A2A_ENABLED=true 和独立的 A2A_SERVICE_SECRET，修改后重启。
+# 2. 推荐使用 demo 配置启动，以便使用租户 OM-FASHION、订单 #1003 和演示邮箱。
+# 3. 复制同目录的 http-client.private.env.json.example，重命名为 http-client.private.env.json。
+#    a2aServiceSecret 填后端相同的密钥，adminEmail、adminPassword 填实际后台账号。
+#    私有文件已被 Git 忽略，请勿把密钥或令牌写入本文件。
+# 4. 在 IDEA 右上角选择 a2a-local；公共地址和租户配置在 http-client.env.json。
+#
+# 【推荐执行顺序】
+# A 组：01 → 02 → 03 → 04 → 05 → 06，体验完整业务协作和后台轨迹。
+# B 组：先执行 01，再执行 10 → 11 → 12 → 13 → 14 → 12 → 15 → 16 → 17 → 18。
+#       请求 12、17 需要重复查询，确认任务达到目标状态后再继续。
+#       请求 19 单独演示取消，执行前重新运行 11、12。
+# 请逐个执行，不要点击“运行全部请求”，以免任务未完成就执行依赖它的后续步骤。
+#
+# 【三类令牌】
+# widgetToken：01 返回的买家令牌，用于 02。
+# adminToken：03 返回的后台令牌，用于 04～06，配合数字租户头 X-Tenant-Id。
+# serviceToken：10～19 的预请求脚本自动签发，绑定租户、会话和目标 Agent，有效期 90 秒。
+# 每次底层请求都会刷新 serviceToken；后台令牌不能替代服务令牌调用 A2A 端点。
+#
+# 【协议字段速查】
+# jsonrpc：JSON-RPC 版本，固定 2.0；A2A 协议版本由 Agent Card 声明为 1.0。
+# id：本次 RPC 请求标识，响应带回相同值；它不是任务 ID。
+# messageId：本条输入消息的标识，用于去重；脚本每次执行都会生成新值。
+# contextId：此项目中对应业务会话 UUID，必须与服务令牌中的会话一致。
+# taskId：已存在的任务 ID；首次提交不传，补充信息续办时传原值。
+# parts[].data：本项目业务输入；version=1 表示业务数据结构版本。
+# deadlineEpochMs：处理截止时间，单位毫秒；脚本设为当前时间加 70000。
+# result.task：响应中的任务对象；读取 result.task.id，而不是 result.id。
+# result.task.artifacts[].parts[].data：业务事实、政策引用、处理结果或审批信息。
+# HTTP 200 仅表示收到响应，还要检查 error、任务状态和业务结果。
+#
+# 【业务边界与观察方式】
+# A 组在身份和证据通过后创建内部待人工审批申请，不会直接执行外部退款。
+# B 组手工演示订单和政策读取；售后申请使用 A 组，以初始化会话和审批保护。
+# 浏览器只能看到买家请求；内部 Agent 通信需用 B 组报文、后端断点或轨迹回放观察。
+# 详细指南：../docs/a2a-http-demo.md。
+
+### 01. 创建买家会话，准备会话 UUID 和买家令牌
+# 前置条件：后端已启动，演示租户 OM-FASHION 可用；此接口无需先登录后台。
+# tenantCode：店铺租户编码，不是数字 tenantId；customerName：买家会话名称。
+# customerEmail：会话登记邮箱，不等于自动完成所有订单归属校验；language=zh 表示中文。
+# 预期响应：data.conversationUuid、data.customerSessionToken 和 expiresAt。
+# 下方响应脚本保存会话和买家令牌，并清除上一轮任务 ID，避免串用旧任务。
+# 每次重新执行 01 都会创建新会话，后续步骤会使用最新会话。
+POST {{baseUrl}}/api/widget/session
+Content-Type: application/json
+
+{
+  "tenantCode": "{{tenantCode}}",
+  "customerEmail": "noah@example.com",
+  "customerName": "A2A Demo Buyer",
+  "language": "zh"
+}
+
+> {%
+    client.assert(response.status === 200 && response.body.data, "创建买家会话失败，请检查服务和租户配置");
+    const session = response.body.data;
+    client.global.set("chatConversation", session.conversationUuid);
+    client.global.set("protocolConversation", session.conversationUuid);
+    client.global.set("widgetToken", session.customerSessionToken);
+    client.global.clear("orderTaskId");
+    client.global.clear("policyTaskId");
+    client.global.clear("traceId");
+    client.log("已创建会话，conversationUuid=" + session.conversationUuid);
+%}
+
+### 02. 发送买家售后诉求，触发 Supervisor 与三个 specialist 完整协作
+# 前置条件：执行 01，确认 A2A 已开启；Authorization 使用买家令牌。
+# tenantCode、conversationUuid 必须与令牌一致；message 提供订单、邮箱和明确退款诉求。
+# intent 是业务意图提示，具体是否进入 A2A 场景仍由后端路由判断。
+# 后端过程：Supervisor → 订单物流核验 → 政策证据判断 → 售后内部审批申请。
+# 预期响应为 text/event-stream，逐步收到 status、final 或 error 等买家事件。
+# 缺证据、模型不可用等情况可能转人工；应查看最终结果，不能只凭 HTTP 200 判断成功。
+# 这里是买家侧 SSE；原始 A2A JSON-RPC/SSE 请查看 10～18。
+# 门禁通过后只创建待人工审批申请，不会直接退款或补发。
+POST {{baseUrl}}/api/widget/chat/stream
+Authorization: Bearer {{widgetToken}}
+Content-Type: application/json
+Accept: text/event-stream
+
+{
+  "tenantCode": "{{tenantCode}}",
+  "conversationUuid": "{{chatConversation}}",
+  "message": "订单 #1003，邮箱 noah@example.com，包裹一直没收到，请申请退款。",
+  "intent": "RETURN_REFUND"
+}
+
+### 03. 登录管理后台，获取查询任务和轨迹所需的后台令牌
+# 前置条件：私有环境文件已填写实际 adminEmail 和 adminPassword。
+# 预期响应为 data.accessToken，响应脚本将其保存为 adminToken。
+# 后台令牌用于 04～06，不能替代 serviceToken 调用 /api/a2a/**。
+# 本请求不创建 Agent 任务，也不修改售后申请。
+POST {{baseUrl}}/api/admin/login
+Content-Type: application/json
+
+{
+  "email": "1254770191@qq.com",
+  "password": "123456"
+}
+
+> {%
+    client.assert(response.status === 200 && response.body.data, "后台登录失败，请检查私有环境中的账号密码");
+    client.global.set("adminToken", response.body.data.accessToken);
+%}
+
+### 04. 查询 A2A 开关、协议版本、SDK 版本和运行模式
+# 前置条件：执行 03，且账号有权访问指定租户。
+# X-Tenant-Id 是数字租户 ID，演示值为 1001，不是租户编码 OM-FASHION。
+# 观察 data.enabled 是否为 true，protocol 是否为 1.0，sdk 是否为 1.5.0.Final。
+# mode=FIXTURE 表示模拟政策资格判断，LIVE 表示真实模型判断；两者均受业务门禁约束。
+# 此处展示配置状态，不代表全部 Agent 已通过网络健康或业务执行检查。
+GET {{baseUrl}}/api/agent/a2a/status
+Authorization: Bearer {{adminToken}}
+X-Tenant-Id: {{tenantId}}
+
+### 05. 查询当前会话产生的真实 A2A 任务及委派关系
+# 前置条件：执行 02 后查询，并已通过 03 登录；可重复运行以刷新任务状态。
+# conversationUuid 使用 01 创建的会话，后端同时按当前已授权租户过滤。
+# 观察 agent_key、id、parent_task_id、trace_id、state、summary 和 approvalRequestNo。
+# parent_task_id 将订单 → 政策 → 售后串成委派链；审批单号表示内部申请已关联。
+# 没有任务时先检查 02 是否确实触发了 A2A。
+# 响应脚本保存首个非空 trace_id 供 06 使用；多轮会话请按目标任务选择对应 trace。
+GET {{baseUrl}}/api/agent/a2a/tasks?conversationUuid={{chatConversation}}
+Authorization: Bearer {{adminToken}}
+X-Tenant-Id: {{tenantId}}
+
+> {%
+    const tasks = response.body.data || [];
+    const traced = tasks.find(task => task.trace_id);
+    if (traced) client.global.set("traceId", traced.trace_id);
+    client.log("当前会话的 A2A 任务数量=" + tasks.length);
+%}
+
+### 06. 查询 Trace 执行轨迹，观察各 Agent 的结果与耗时
+# 前置条件：执行 05，且任务列表中已经有非空 trace_id。
+# 观察 run 和 steps：A2A 步骤、任务 ID、状态、耗时以及脱敏结果摘要。
+# 将步骤中的任务 ID 与 05 的 id 对应，可以定位失败或等待输入的 Agent。
+# 也可在后台“轨迹回放”页面打开该 trace；敏感快照不会以明文直接返回。
+GET {{baseUrl}}/api/observability/traces/{{traceId}}
+Authorization: Bearer {{adminToken}}
+X-Tenant-Id: {{tenantId}}
+
+### 10. 发现订单物流 Agent，获取标准 Agent Card 能力声明
+# 前置条件：执行 01；私有环境中的 a2aServiceSecret 与后端密钥完全一致。
+# 下方 < ./http/a2a-auth.js 在发送前执行脚本，自动生成本请求的 serviceToken。
+# 这是普通 HTTP GET；读取 Card 不创建业务任务，也没有额外的连接握手。
+# supportedInterfaces：协议绑定、服务地址、protocolVersion；skills：提供的能力。
+# capabilities.streaming：流式能力；securitySchemes / securityRequirements：鉴权声明。
+# 该项目的 Card 同样需要服务令牌；返回 401 时先核对密钥和目标 Agent。
+< ./http/a2a-auth.js
+GET {{baseUrl}}/api/a2a/order-logistics/.well-known/agent-card.json
+Authorization: Bearer {{serviceToken}}
+Accept: application/json
+
+### 11. 提交订单物流任务，故意缺少身份信息以观察等待输入
+# 前置条件：执行 01 和 10；本请求只演示订单查询，不创建审批申请。
+# SendMessage 表示发送 A2A 消息；首次不传 taskId，服务端会创建新任务。
+# role=ROLE_USER 是当前 SDK 的协议角色值，保持大小写；contextId 必须与令牌会话一致。
+# parts[].data 承载业务输入；version=1 是业务结构版本，orderId 是待查询订单。
+# 故意不传 customerIdentity，预期最终进入 TASK_STATE_INPUT_REQUIRED，要求补充邮箱或手机号。
+# 响应脚本保存 result.task.id 为 orderTaskId，后续查询、续办和取消均使用它。
+# 初次响应可能仍为 SUBMITTED 或 WORKING，请使用 12 查询最终状态。
+# 每次重跑 11 都生成新 messageId 和新任务，不是“重复同一消息”的幂等测试。
+< ./http/a2a-auth.js
+POST {{baseUrl}}/api/a2a/order-logistics
+Authorization: Bearer {{serviceToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": "{{rpcId}}",
+  "method": "SendMessage",
+  "params": {
+    "message": {
+      "role": "ROLE_USER",
+      "messageId": "{{messageId}}",
+      "contextId": "{{protocolConversation}}",
+      "parts": [{"data": {
+        "version": 1,
+        "orderId": "#1003",
+        "question": "包裹一直没收到，请核查物流。",
+        "deadlineEpochMs": {{deadlineEpochMs}}
+      }}]
+    }
+  }
+}
+
+> {%
+    client.assert(!response.body.error, JSON.stringify(response.body.error));
+    const task = response.body.result.task;
+    client.global.set("orderTaskId", task.id);
+    client.log("订单任务 ID=" + task.id + "，当前状态=" + task.status.state);
+%}
+
+### 12. 查询订单任务，先确认等待输入，续办后再确认完成
+# 前置条件：11 已返回并保存 orderTaskId。
+# GetTask 读取已有任务；params.id 是任务 ID，顶层 id 是本次 RPC 标识，两者不同。
+# 执行 11 后重复查询，直到 result.task.status.state=TASK_STATE_INPUT_REQUIRED。
+# 执行 14 后再次查询，预期变为 TASK_STATE_COMPLETED。
+# 完成时查看 result.task.artifacts[].parts[].data.facts 中的订单和物流事实。
+# INPUT_REQUIRED 表示等待补充；FAILED / REJECTED 应查看原因，不能假定核验成功。
+# Task not found 时核对任务所属租户、会话，以及是否向正确 Agent 查询。
+< ./http/a2a-auth.js
+POST {{baseUrl}}/api/a2a/order-logistics
+Authorization: Bearer {{serviceToken}}
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": "{{rpcId}}",
+  "method": "GetTask",
+  "params": {"id": "{{orderTaskId}}"}
+}
+
+### 13. 订阅已有任务的原始 A2A SSE 事件，请在 14 之前执行
+# 前置条件：11 已创建任务，推荐先用 12 确认它正在等待输入。
+# SubscribeToTask 只订阅原任务，不创建新任务，也不会自动补充业务信息。
+# Accept: text/event-stream 表示接收 SSE；观察每帧 id:、data: 及其中的任务状态。
+# 当前实现从头重放持久化快照，可看到 SUBMITTED → WORKING → INPUT_REQUIRED。
+# 遇到等待输入或终态时流关闭，这是正常行为；之后用 14 续办。
+# 续办后再次订阅也会从头重放，可能在旧 INPUT_REQUIRED 快照处结束。
+# 判断最新状态请使用 12；本示例不提供 Last-Event-ID 增量恢复。
+< ./http/a2a-auth.js
+POST {{baseUrl}}/api/a2a/order-logistics
+Authorization: Bearer {{serviceToken}}
+Content-Type: application/json
+Accept: text/event-stream
+
+{
+  "jsonrpc": "2.0",
+  "id": "{{rpcId}}",
+  "method": "SubscribeToTask",
+  "params": {"id": "{{orderTaskId}}"}
+}
+
+### 14. 补充订单身份信息，续办同一个等待中的任务
+# 前置条件：用 12 确认原任务处于 TASK_STATE_INPUT_REQUIRED。
+# 仍调用 SendMessage，但增加 taskId=原 orderTaskId，表示续办而不是新建任务。
+# contextId 保持原会话不变；messageId 必须换新，预请求脚本会自动生成。
+# customerIdentity 填订单归属邮箱，演示订单 #1003 对应 noah@example.com。
+# 本项目续办需要完整业务输入，不是仅发送新增字段的局部补丁。
+# 预期返回同一任务 ID；重新核验后完成任务，或返回无法核验的原因。
+# 执行后回到 12 查询，确认完成后再运行政策委派请求 16。
+# 已完成、失败或取消的任务不能直接续办；可重新运行 11 开始新的演示。
+< ./http/a2a-auth.js
+POST {{baseUrl}}/api/a2a/order-logistics
+Authorization: Bearer {{serviceToken}}
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": "{{rpcId}}",
+  "method": "SendMessage",
+  "params": {
+    "message": {
+      "role": "ROLE_USER",
+      "messageId": "{{messageId}}",
+      "contextId": "{{protocolConversation}}",
+      "taskId": "{{orderTaskId}}",
+      "parts": [{"data": {
+        "version": 1,
+        "orderId": "#1003",
+        "customerIdentity": "noah@example.com",
+        "question": "包裹一直没收到，请核查物流。",
+        "deadlineEpochMs": {{deadlineEpochMs}}
+      }}]
+    }
+  }
+}
+
+### 15. 发现政策 Agent，观察服务身份的目标受众约束
+# 获取政策 Agent 的 Card，对比 10 中的 name、skills 和 supportedInterfaces。
+# 预请求脚本根据 URL 自动将 JWT audience 改为 policy，而不是 order-logistics。
+# 订单 Agent 的令牌不能直接用于政策 Agent，每个目标都要通过自己的受众校验。
+# tenant 和 conversation 保持同一业务上下文，使政策任务能够引用订单证据。
+< ./http/a2a-auth.js
+GET {{baseUrl}}/api/a2a/policy/.well-known/agent-card.json
+Authorization: Bearer {{serviceToken}}
+
+### 16. 委派政策任务，引用已完成的可信订单证据
+# 前置条件：14 已续办成功，并用 12 确认订单任务为 TASK_STATE_COMPLETED。
+# 向 policy 端点发送 SendMessage，会创建独立政策任务，不会覆盖订单任务。
+# orderTaskId：政策 Agent 在服务端读取该任务的已验证事实，不信任调用者手工拼接的事实。
+# parentTaskId：记录本任务的上游关联，便于展示委派关系；question：要核查的政策问题。
+# 引用的任务必须属于相同租户、会话及正确 Agent，否则无法通过证据检查。
+# 响应脚本保存 policyTaskId，初次可能尚未完成，请继续使用 17 查询。
+# 此请求只做政策判断，不会因提到退款或补发就直接创建售后审批申请。
+< ./http/a2a-auth.js
+POST {{baseUrl}}/api/a2a/policy
+Authorization: Bearer {{serviceToken}}
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": "{{rpcId}}",
+  "method": "SendMessage",
+  "params": {
+    "message": {
+      "role": "ROLE_USER",
+      "messageId": "{{messageId}}",
+      "contextId": "{{protocolConversation}}",
+      "parts": [{"data": {
+        "version": 1,
+        "orderId": "#1003",
+        "customerIdentity": "noah@example.com",
+        "question": "包裹未收到，物流异常时是否可以申请退款或补发人工审核？",
+        "orderTaskId": "{{orderTaskId}}",
+        "parentTaskId": "{{orderTaskId}}",
+        "deadlineEpochMs": {{deadlineEpochMs}}
+      }}]
+    }
+  }
+}
+
+> {%
+    client.assert(!response.body.error, JSON.stringify(response.body.error));
+    client.global.set("policyTaskId", response.body.result.task.id);
+%}
+
+### 17. 查询政策结果，观察政策引用及是否支持提交人工审核
+# 前置条件：16 已创建并保存 policyTaskId；任务未完成时可以重复查询。
+# GetTask 必须发往 policy 端点，不能拿政策任务 ID 向订单 Agent 查询。
+# 查看 result.task.status.state；完成后读取 artifacts[].parts[].data。
+# eligible：是否支持进入内部人工审核；policy.citations：政策引用；mode：FIXTURE 或 LIVE。
+# eligible=true 不代表退款已执行，也不代表人工审批已经通过。
+# 证据不足或模型不可用时，应查看任务状态、reason、message 等结果字段。
+< ./http/a2a-auth.js
+POST {{baseUrl}}/api/a2a/policy
+Authorization: Bearer {{serviceToken}}
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": "{{rpcId}}",
+  "method": "GetTask",
+  "params": {"id": "{{policyTaskId}}"}
+}
+
+### 18. 流式提交新的订单只读任务，一次观察原始 A2A SSE 帧
+# 前置条件：执行 01 并配置正确服务密钥；本请求不依赖 11 的旧任务。
+# SendStreamingMessage 同时完成“提交新消息”和“流式观察该任务”。
+# 不传 taskId，使用新 messageId；携带完整订单邮箱以便直接核验。
+# 响应为 text/event-stream，每个 data: 中都是 A2A JSON-RPC 响应。
+# 观察 result.task.status.state 从 SUBMITTED、WORKING 到 COMPLETED 或其他业务状态。
+# 完成帧中查看 artifacts[].parts[].data.facts；流结束不等于业务一定成功。
+# 此请求只查询订单，不创建售后申请，也不会覆盖全局 orderTaskId。
+< ./http/a2a-auth.js
+POST {{baseUrl}}/api/a2a/order-logistics
+Authorization: Bearer {{serviceToken}}
+Content-Type: application/json
+Accept: text/event-stream
+
+{
+  "jsonrpc": "2.0",
+  "id": "{{rpcId}}",
+  "method": "SendStreamingMessage",
+  "params": {
+    "message": {
+      "role": "ROLE_USER",
+      "messageId": "{{messageId}}",
+      "contextId": "{{protocolConversation}}",
+      "parts": [{"data": {
+        "version": 1,
+        "orderId": "#1003",
+        "customerIdentity": "noah@example.com",
+        "question": "请核查这笔订单的物流。",
+        "deadlineEpochMs": {{deadlineEpochMs}}
+      }}]
+    }
+  }
+}
+
+### 19. 取消等待输入的任务，观察取消状态及不可取消错误
+# 单独演示：重新执行 11，再用 12 确认新任务为 TASK_STATE_INPUT_REQUIRED，然后执行本请求。
+# CancelTask 的 params.id 是任务 ID；租户和会话约束来自已验证的服务身份。
+# 成功后预期 result.task.status.state=TASK_STATE_CANCELED，可再用 12 查询确认。
+# 已完成或其他终态任务不能取消，会返回 TaskNotCancelableError；HTTP 200 时也要检查 error。
+# 取消不会撤销已提交的审批申请；执行中的业务事务可能需要先结束才能确认取消结果。
+# 被取消的任务不能用 14 续办，重新运行 11 可以创建另一笔演示任务。
+< ./http/a2a-auth.js
+POST {{baseUrl}}/api/a2a/order-logistics
+Authorization: Bearer {{serviceToken}}
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": "{{rpcId}}",
+  "method": "CancelTask",
+  "params": {"id": "{{orderTaskId}}"}
+}

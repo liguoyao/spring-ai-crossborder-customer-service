@@ -99,6 +99,7 @@
           </div>
         </a-timeline-item>
       </a-timeline>
+      <A2aTaskPanel v-if="detail.run?.conversationUuid" :conversation-uuid="detail.run.conversationUuid" />
     </a-drawer>
   </div>
 </template>
@@ -108,6 +109,7 @@ import { onMounted, reactive, ref } from "vue";
 import { useRoute } from "vue-router";
 import { ReloadOutlined } from "@ant-design/icons-vue";
 import api from "@/api";
+import A2aTaskPanel from '@/components/admin/A2aTaskPanel.vue';
 import {
   failureCategoryLabel,
   intentLabel,

@@ -6,3 +6,8 @@ omnimerchant:
   demo:
     enabled: true
     seed-version: v4-ui-2026.07
+
+agent:
+  a2a:
+    enabled: ${A2A_ENABLED:true}
+    fixture: true

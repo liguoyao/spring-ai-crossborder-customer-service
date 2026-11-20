@@ -8,6 +8,7 @@
 .env
 .env.local
 .env.*.local
+scripts/http-client.private.env.json
 
 # ====================
 # Java / Maven
