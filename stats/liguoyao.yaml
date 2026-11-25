@@ -1,0 +1,72 @@
+username: liguoyao
+updatedAt: 2026-11-25T01:56:17.147Z
+skills: {}
+interventions:
+  sessions: 4
+  interrupt: 0
+  toolReject: 0
+  correction: 0
+prompts: 16
+tokens:
+  input: 125107
+  output: 7597
+  cacheRead: 2069760
+  cacheCreation: 0
+daily:
+  2026-11-24:
+    sessionsEnded: 2
+    sessionsSucceeded: 2
+    promptTurns: 11
+    durationMs: 1416170
+    sessionsCorrected: 0
+    pricedRequests: 35
+    costMicros: 165150
+    cacheReadTokens: 1523200
+    cacheEligibleInputTokens: 1585771
+    priceVersion: litellm-2026-10-31-b264711
+  2026-11-25:
+    sessionsEnded: 1
+    sessionsSucceeded: 1
+    promptTurns: 3
+    durationMs: 202788
+    sessionsCorrected: 0
+    pricedRequests: 9
+    costMicros: 101429
+    cacheReadTokens: 546560
+    cacheEligibleInputTokens: 609096
+    priceVersion: litellm-2026-10-31-b264711
+attended:
+  interventions:
+    sessions: 4
+    interrupt: 0
+    toolReject: 0
+    correction: 0
+  prompts: 16
+  tokens:
+    input: 125107
+    output: 7597
+    cacheRead: 2069760
+    cacheCreation: 0
+  daily:
+    2026-11-24:
+      sessionsEnded: 2
+      sessionsSucceeded: 2
+      promptTurns: 11
+      durationMs: 1416170
+      sessionsCorrected: 0
+      pricedRequests: 35
+      costMicros: 165150
+      cacheReadTokens: 1523200
+      cacheEligibleInputTokens: 1585771
+      priceVersion: litellm-2026-10-31-b264711
+    2026-11-25:
+      sessionsEnded: 1
+      sessionsSucceeded: 1
+      promptTurns: 3
+      durationMs: 202788
+      sessionsCorrected: 0
+      pricedRequests: 9
+      costMicros: 101429
+      cacheReadTokens: 546560
+      cacheEligibleInputTokens: 609096
+      priceVersion: litellm-2026-10-31-b264711
